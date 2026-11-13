@@ -111,9 +111,11 @@ service cloud.firestore {
              data.displayName is string && data.displayName.size() >= 2 && data.displayName.size() <= 60 &&
              data.companyName is string && data.companyName.size() <= 80 &&
              data.specialty in [
-               'soil_engineer', 'general_engineer', 'drainage_contractor', 'leak_specialist',
-               'water_mitigation', 'mold_remediation', 'smoke_fire_restoration', 'full_service_restoration',
-               'iicrc_inspector'
+               'soil_engineer', 'structural_engineer', 'general_engineer', 'industrial_hygienist',
+               'landscaper', 'drainage_contractor', 'leak_specialist', 'water_mitigation',
+               'mold_remediation', 'smoke_fire_restoration', 'full_service_restoration',
+               'iicrc_inspector', 'plumber', 'roofer', 'foundation_specialist',
+               'electrician', 'hvac', 'general_contractor'
              ] &&
              data.licenseNumber is string && data.licenseNumber.size() >= 3 && data.licenseNumber.size() <= 40 &&
              data.licensingState is string && data.licensingState.size() >= 2 && data.licensingState.size() <= 30 &&
@@ -341,6 +343,125 @@ service cloud.firestore {
              data.lastMessageFromRole in ['client', 'contractor', 'insurer'] &&
              data.communicationLog is list && data.communicationLog.size() <= 30 &&
              (data.communicationLog.size() == 0 || (data.communicationLog[0] is string && data.communicationLog[0].size() <= 400)) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidSavedProperty(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.label is string && data.label.size() >= 1 && data.label.size() <= 60 &&
+             data.propertyType in ['house', 'business'] &&
+             data.address is string && data.address.size() <= 160 &&
+             data.city is string && data.city.size() >= 1 && data.city.size() <= 80 &&
+             data.state is string && data.state.size() <= 40 &&
+             data.latitude is number && data.latitude >= -90.0 && data.latitude <= 90.0 &&
+             data.longitude is number && data.longitude >= -180.0 && data.longitude <= 180.0 &&
+             data.femaFloodZone is string && data.femaFloodZone.size() <= 120 &&
+             data.fireHazardZone is string && data.fireHazardZone.size() <= 120 &&
+             data.waterTableDepthFt is number && data.waterTableDepthFt >= 0.0 && data.waterTableDepthFt <= 200.0 &&
+             data.hazardSummary is string && data.hazardSummary.size() <= 800 &&
+             data.notifyPriorityAlerts is bool &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidContractorProductReview(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.contractorName is string && data.contractorName.size() >= 1 && data.contractorName.size() <= 60 &&
+             data.companyName is string && data.companyName.size() <= 80 &&
+             data.licenseNumber is string && data.licenseNumber.size() <= 40 &&
+             data.productSku is string && data.productSku.size() >= 1 && data.productSku.size() <= 60 &&
+             data.productName is string && data.productName.size() >= 2 && data.productName.size() <= 120 &&
+             data.brandModel is string && data.brandModel.size() <= 80 &&
+             data.category is string && data.category.size() <= 60 &&
+             data.disasterUseCase in ['flooding', 'wildfire_smoke', 'mold_cleanse', 'groundwater'] &&
+             data.rating is int && data.rating >= 1 && data.rating <= 5 &&
+             data.jobsUsedCount is int && data.jobsUsedCount >= 1 && data.jobsUsedCount <= 5000 &&
+             data.pros is string && data.pros.size() <= 400 &&
+             data.cons is string && data.cons.size() <= 400 &&
+             data.honestReview is string && data.honestReview.size() >= 5 && data.honestReview.size() <= 1500 &&
+             data.wouldUseOnInsuredJob is bool &&
+             data.isPublic is bool && data.isPublic == true &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidEquipmentRental(data) {
+      return data.ownerUserId is string && data.ownerUserId.size() >= 1 && data.ownerUserId.size() <= 128 &&
+             data.ownerName is string && data.ownerName.size() >= 1 && data.ownerName.size() <= 60 &&
+             data.ownerType in ['restoration_company', 'resident'] &&
+             data.companyName is string && data.companyName.size() <= 80 &&
+             data.equipmentName is string && data.equipmentName.size() >= 2 && data.equipmentName.size() <= 100 &&
+             data.category is string && data.category.size() >= 2 && data.category.size() <= 40 &&
+             data.city is string && data.city.size() >= 1 && data.city.size() <= 80 &&
+             data.dailyRateUsd is int && data.dailyRateUsd >= 5 && data.dailyRateUsd <= 2500 &&
+             data.depositUsd is int && data.depositUsd >= 0 && data.depositUsd <= 10000 &&
+             data.specs is string && data.specs.size() <= 500 &&
+             data.contactPhoneOrNote is string && data.contactPhoneOrNote.size() <= 120 &&
+             data.isAvailable is bool &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidAppRevisionSuggestion(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 60 &&
+             data.authorRole in ['contractor', 'resident', 'insurer', 'iicrc_inspector'] &&
+             data.tradeOrSpecialty is string && data.tradeOrSpecialty.size() <= 60 &&
+             data.title is string && data.title.size() >= 3 && data.title.size() <= 120 &&
+             data.category in ['Workflow', 'AI Diagnostics', 'Safety & Licensing', 'Insurance', 'Equipment & DIY'] &&
+             data.description is string && data.description.size() >= 5 && data.description.size() <= 1200 &&
+             data.upvotesCount is int && data.upvotesCount >= 0 && data.upvotesCount <= 1000000 &&
+             data.status in ['submitted', 'planned', 'shipped'] &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidHygienistRequest(data) {
+      return data.clientUserId is string && data.clientUserId.size() >= 1 && data.clientUserId.size() <= 128 &&
+             data.clientName is string && data.clientName.size() >= 1 && data.clientName.size() <= 60 &&
+             data.hygienistUserId is string && data.hygienistUserId.size() >= 1 && data.hygienistUserId.size() <= 128 &&
+             data.hygienistName is string && data.hygienistName.size() <= 60 &&
+             data.city is string && data.city.size() >= 1 && data.city.size() <= 80 &&
+             data.propertyAddressHint is string && data.propertyAddressHint.size() <= 160 &&
+             data.sampleTypes is list && data.sampleTypes.size() >= 1 && data.sampleTypes.size() <= 6 &&
+             data.sampleTypes[0] is string &&
+             data.reasonNotes is string && data.reasonNotes.size() <= 800 &&
+             data.status in ['requested', 'accepted', 'sampled', 'lab_report_ready', 'cancelled'] &&
+             data.quotedFeeUsd is int && data.quotedFeeUsd >= 0 && data.quotedFeeUsd <= 15000 &&
+             data.labFindingsSummary is string && data.labFindingsSummary.size() <= 1500 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidInsurancePolicyOffer(data) {
+      return data.insurerUserId is string && data.insurerUserId.size() >= 1 && data.insurerUserId.size() <= 128 &&
+             data.carrierName is string && data.carrierName.size() >= 2 && data.carrierName.size() <= 100 &&
+             data.clientUserId is string && data.clientUserId.size() >= 1 && data.clientUserId.size() <= 128 &&
+             data.clientName is string && data.clientName.size() <= 60 &&
+             data.propertyLabel is string && data.propertyLabel.size() >= 1 && data.propertyLabel.size() <= 120 &&
+             data.city is string && data.city.size() >= 1 && data.city.size() <= 80 &&
+             data.coverageType in ['homeowners_ho3', 'flood_nfip', 'wildfire_dic', 'landlord'] &&
+             data.coverageLimitUsd is int && data.coverageLimitUsd >= 10000 && data.coverageLimitUsd <= 10000000 &&
+             data.deductibleUsd is int && data.deductibleUsd >= 0 && data.deductibleUsd <= 100000 &&
+             data.baseMonthlyPremiumUsd is int && data.baseMonthlyPremiumUsd >= 10 && data.baseMonthlyPremiumUsd <= 25000 &&
+             data.telemetryDiscountPercent is int && data.telemetryDiscountPercent >= 0 && data.telemetryDiscountPercent <= 45 &&
+             data.discountedMonthlyPremiumUsd is int && data.discountedMonthlyPremiumUsd >= 10 && data.discountedMonthlyPremiumUsd <= 25000 &&
+             data.policyTermsSummary is string && data.policyTermsSummary.size() <= 1000 &&
+             data.status in ['requested', 'quoted', 'client_accepted', 'bound', 'declined'] &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidFieldScoutApplication(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.applicantName is string && data.applicantName.size() >= 2 && data.applicantName.size() <= 60 &&
+             data.city is string && data.city.size() >= 1 && data.city.size() <= 80 &&
+             data.scoutScore is int && data.scoutScore >= 0 && data.scoutScore <= 1000000 &&
+             data.verifiedReportsCount is int && data.verifiedReportsCount >= 0 && data.verifiedReportsCount <= 100000 &&
+             data.availabilitySummary is string && data.availabilitySummary.size() >= 2 && data.availabilitySummary.size() <= 300 &&
+             data.coverageNotes is string && data.coverageNotes.size() <= 800 &&
+             data.status in ['applied', 'active_paid_scout', 'paused'] &&
              isValidTimestamp(data.createdAt) &&
              isValidTimestamp(data.updatedAt);
     }
@@ -921,6 +1042,248 @@ service cloud.firestore {
                           ]))
                        );
       allow delete: if false;
+    }
+
+    match /saved_properties/{propId} {
+      allow get: if isSignedIn() && isValidId(propId) && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+      allow create: if isSignedIn() &&
+                       isValidId(propId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'userId', 'label', 'propertyType', 'address', 'city', 'state',
+                         'latitude', 'longitude', 'femaFloodZone', 'fireHazardZone',
+                         'waterTableDepthFt', 'hazardSummary', 'notifyPriorityAlerts', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'label', 'propertyType', 'address', 'city', 'state',
+                         'latitude', 'longitude', 'femaFloodZone', 'fireHazardZone',
+                         'waterTableDepthFt', 'hazardSummary', 'notifyPriorityAlerts', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidSavedProperty(incoming());
+      allow update: if isSignedIn() &&
+                       isValidId(propId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidSavedProperty(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'notifyPriorityAlerts', 'label', 'femaFloodZone', 'fireHazardZone', 'hazardSummary', 'updatedAt'
+                       ]);
+      allow delete: if isSignedIn() && isValidId(propId) && existing().userId == request.auth.uid;
+    }
+
+    match /contractor_product_reviews/{revId} {
+      allow get: if isSignedIn() && isValidId(revId) &&
+                    (existing().isPublic == true || existing().userId == request.auth.uid);
+      allow list: if isSignedIn() && (existing().isPublic == true || existing().userId == request.auth.uid);
+      allow create: if isSignedIn() &&
+                       isValidId(revId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'userId', 'contractorName', 'companyName', 'licenseNumber',
+                         'productSku', 'productName', 'brandModel', 'category', 'disasterUseCase',
+                         'rating', 'jobsUsedCount', 'pros', 'cons', 'honestReview',
+                         'wouldUseOnInsuredJob', 'isPublic', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'contractorName', 'companyName', 'licenseNumber',
+                         'productSku', 'productName', 'brandModel', 'category', 'disasterUseCase',
+                         'rating', 'jobsUsedCount', 'pros', 'cons', 'honestReview',
+                         'wouldUseOnInsuredJob', 'isPublic', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidContractorProductReview(incoming());
+      allow update, delete: if isSignedIn() && isValidId(revId) && existing().userId == request.auth.uid;
+    }
+
+    match /equipment_rentals/{rentalId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() &&
+                       isValidId(rentalId) &&
+                       incoming().ownerUserId == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'ownerUserId', 'ownerName', 'ownerType', 'companyName', 'equipmentName',
+                         'category', 'city', 'dailyRateUsd', 'depositUsd', 'specs',
+                         'contactPhoneOrNote', 'isAvailable', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'ownerUserId', 'ownerName', 'ownerType', 'companyName', 'equipmentName',
+                         'category', 'city', 'dailyRateUsd', 'depositUsd', 'specs',
+                         'contactPhoneOrNote', 'isAvailable', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidEquipmentRental(incoming());
+      allow update: if isSignedIn() &&
+                       isValidId(rentalId) &&
+                       existing().ownerUserId == request.auth.uid &&
+                       incoming().ownerUserId == existing().ownerUserId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidEquipmentRental(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'isAvailable', 'dailyRateUsd', 'depositUsd', 'specs', 'contactPhoneOrNote', 'updatedAt'
+                       ]);
+      allow delete: if isSignedIn() && isValidId(rentalId) && existing().ownerUserId == request.auth.uid;
+    }
+
+    match /app_revision_suggestions/{suggestionId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() &&
+                       isValidId(suggestionId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().upvotesCount == 0 &&
+                       incoming().status == 'submitted' &&
+                       incoming().keys().hasAll([
+                         'userId', 'authorName', 'authorRole', 'tradeOrSpecialty',
+                         'title', 'category', 'description', 'upvotesCount', 'status',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'authorName', 'authorRole', 'tradeOrSpecialty',
+                         'title', 'category', 'description', 'upvotesCount', 'status',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidAppRevisionSuggestion(incoming());
+      allow update: if isSignedIn() &&
+                       isValidId(suggestionId) &&
+                       isValidAppRevisionSuggestion(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt && (
+                         (existing().userId == request.auth.uid &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'updatedAt'])) ||
+                         (incoming().upvotesCount == existing().upvotesCount + 1 &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['upvotesCount', 'updatedAt']))
+                       );
+      allow delete: if isSignedIn() && isValidId(suggestionId) && existing().userId == request.auth.uid;
+    }
+
+    match /hygienist_requests/{reqId} {
+      allow get: if isSignedIn() && isValidId(reqId) &&
+                    (existing().clientUserId == request.auth.uid ||
+                     existing().hygienistUserId == request.auth.uid ||
+                     existing().hygienistUserId == 'open_marketplace');
+      allow list: if isSignedIn() &&
+                     (existing().clientUserId == request.auth.uid ||
+                      existing().hygienistUserId == request.auth.uid ||
+                      existing().hygienistUserId == 'open_marketplace');
+      allow create: if isSignedIn() &&
+                       isValidId(reqId) &&
+                       incoming().clientUserId == request.auth.uid &&
+                       incoming().status == 'requested' &&
+                       incoming().quotedFeeUsd == 0 &&
+                       incoming().keys().hasAll([
+                         'clientUserId', 'clientName', 'hygienistUserId', 'hygienistName',
+                         'city', 'propertyAddressHint', 'sampleTypes', 'reasonNotes',
+                         'status', 'quotedFeeUsd', 'labFindingsSummary', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'clientUserId', 'clientName', 'hygienistUserId', 'hygienistName',
+                         'city', 'propertyAddressHint', 'sampleTypes', 'reasonNotes',
+                         'status', 'quotedFeeUsd', 'labFindingsSummary', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidHygienistRequest(incoming());
+      allow update: if isSignedIn() &&
+                       isValidId(reqId) &&
+                       isValidHygienistRequest(incoming()) &&
+                       incoming().clientUserId == existing().clientUserId &&
+                       incoming().createdAt == existing().createdAt && (
+                         (existing().clientUserId == request.auth.uid &&
+                          incoming().status == 'cancelled' &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+                         (existing().clientUserId != request.auth.uid &&
+                          (existing().hygienistUserId == 'open_marketplace' || existing().hygienistUserId == request.auth.uid) &&
+                          exists(/databases/$(database)/documents/contractors/$(request.auth.uid)) &&
+                          get(/databases/$(database)/documents/contractors/$(request.auth.uid)).data.specialty in [
+                            'industrial_hygienist', 'iicrc_inspector', 'mold_remediation', 'full_service_restoration'
+                          ] &&
+                          incoming().hygienistUserId == request.auth.uid &&
+                          incoming().status in ['accepted', 'sampled', 'lab_report_ready'] &&
+                          incoming().diff(existing()).affectedKeys().hasOnly([
+                            'hygienistUserId', 'hygienistName', 'status', 'quotedFeeUsd', 'labFindingsSummary', 'updatedAt'
+                          ]))
+                       );
+      allow delete: if isSignedIn() && isValidId(reqId) && existing().clientUserId == request.auth.uid;
+    }
+
+    match /insurance_policies/{policyId} {
+      allow get: if isSignedIn() && isValidId(policyId) &&
+                    (existing().insurerUserId == request.auth.uid ||
+                     existing().clientUserId == request.auth.uid ||
+                     existing().clientUserId == 'open_quote');
+      allow list: if isSignedIn() &&
+                     (existing().insurerUserId == request.auth.uid ||
+                      existing().clientUserId == request.auth.uid ||
+                      existing().clientUserId == 'open_quote');
+      allow create: if isSignedIn() &&
+                       isValidId(policyId) &&
+                       incoming().keys().hasAll([
+                         'insurerUserId', 'carrierName', 'clientUserId', 'clientName',
+                         'propertyLabel', 'city', 'coverageType', 'coverageLimitUsd',
+                         'deductibleUsd', 'baseMonthlyPremiumUsd', 'telemetryDiscountPercent',
+                         'discountedMonthlyPremiumUsd', 'policyTermsSummary', 'status', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'insurerUserId', 'carrierName', 'clientUserId', 'clientName',
+                         'propertyLabel', 'city', 'coverageType', 'coverageLimitUsd',
+                         'deductibleUsd', 'baseMonthlyPremiumUsd', 'telemetryDiscountPercent',
+                         'discountedMonthlyPremiumUsd', 'policyTermsSummary', 'status', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidInsurancePolicyOffer(incoming()) && (
+                         (incoming().insurerUserId == request.auth.uid &&
+                          incoming().status == 'quoted' &&
+                          exists(/databases/$(database)/documents/insurance_carriers/$(request.auth.uid))) ||
+                         (incoming().clientUserId == request.auth.uid &&
+                          incoming().status == 'requested')
+                       );
+      allow update: if isSignedIn() &&
+                       isValidId(policyId) &&
+                       isValidInsurancePolicyOffer(incoming()) &&
+                       incoming().createdAt == existing().createdAt && (
+                         ((existing().clientUserId == request.auth.uid || existing().clientUserId == 'open_quote') &&
+                          incoming().clientUserId == request.auth.uid &&
+                          incoming().insurerUserId == existing().insurerUserId &&
+                          incoming().baseMonthlyPremiumUsd == existing().baseMonthlyPremiumUsd &&
+                          incoming().discountedMonthlyPremiumUsd == existing().discountedMonthlyPremiumUsd &&
+                          incoming().status in ['client_accepted', 'declined'] &&
+                          incoming().diff(existing()).affectedKeys().hasOnly([
+                            'clientUserId', 'clientName', 'status', 'updatedAt'
+                          ])) ||
+                         (existing().insurerUserId == request.auth.uid &&
+                          incoming().insurerUserId == existing().insurerUserId &&
+                          incoming().status in ['quoted', 'bound', 'declined'] &&
+                          incoming().diff(existing()).affectedKeys().hasOnly([
+                            'coverageLimitUsd', 'deductibleUsd', 'baseMonthlyPremiumUsd',
+                            'telemetryDiscountPercent', 'discountedMonthlyPremiumUsd',
+                            'policyTermsSummary', 'status', 'updatedAt'
+                          ]))
+                       );
+      allow delete: if isSignedIn() && isValidId(policyId) &&
+                       (existing().insurerUserId == request.auth.uid || existing().clientUserId == request.auth.uid);
+    }
+
+    match /field_scout_applications/{appId} {
+      allow get, list: if isSignedIn() && existing().userId == request.auth.uid;
+      allow create: if isSignedIn() &&
+                       isValidId(appId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().status == 'applied' &&
+                       incoming().keys().hasAll([
+                         'userId', 'applicantName', 'city', 'scoutScore', 'verifiedReportsCount',
+                         'availabilitySummary', 'coverageNotes', 'status', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'applicantName', 'city', 'scoutScore', 'verifiedReportsCount',
+                         'availabilitySummary', 'coverageNotes', 'status', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidFieldScoutApplication(incoming());
+      allow update: if isSignedIn() &&
+                       isValidId(appId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidFieldScoutApplication(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'availabilitySummary', 'coverageNotes', 'status', 'updatedAt'
+                       ]);
+      allow delete: if isSignedIn() && isValidId(appId) && existing().userId == request.auth.uid;
     }
   }
 }

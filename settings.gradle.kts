@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "WaterTable"
+rootProject.name = "insights"
 
 include(":app")

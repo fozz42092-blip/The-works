@@ -5,8 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -30,6 +34,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -69,6 +75,7 @@ import com.example.data.repository.AiVideoStudioRepository
 import com.example.data.repository.LiveWeatherAndNewsRepository
 import com.example.data.repository.LocationRepository
 import com.example.data.repository.WaterTableRepository
+import com.example.notifications.DisasterAlertManager
 import com.example.ui.UiState
 import com.example.ui.WaterTableViewModel
 import com.example.ui.auth.AuthScreen
@@ -181,6 +188,10 @@ fun WaterTableMainShell(currentUserId: String) {
     val riskSummary by viewModel.streetFloodRiskSummary.collectAsStateWithLifecycle()
     val mediaAttachment by viewModel.mediaAttachment.collectAsStateWithLifecycle()
     val extraPhotos by viewModel.extraPhotos.collectAsStateWithLifecycle()
+    val buildingPhotoAttachment by viewModel.buildingPhotoAttachment.collectAsStateWithLifecycle()
+    val buildingExtraPhotos by viewModel.buildingExtraPhotos.collectAsStateWithLifecycle()
+    val pestPhotoAttachment by viewModel.pestPhotoAttachment.collectAsStateWithLifecycle()
+    val pestExtraPhotos by viewModel.pestExtraPhotos.collectAsStateWithLifecycle()
     val reviewProofAttachment by viewModel.reviewProofAttachment.collectAsStateWithLifecycle()
     val portfolioAttachment by viewModel.portfolioAttachment.collectAsStateWithLifecycle()
     val videoReferencePhoto by viewModel.videoReferenceAttachment.collectAsStateWithLifecycle()
@@ -199,12 +210,63 @@ fun WaterTableMainShell(currentUserId: String) {
     val isGuideStreaming by viewModel.isGuideStreaming.collectAsStateWithLifecycle()
     val completedTutorialSteps by viewModel.completedTutorialSteps.collectAsStateWithLifecycle()
 
+    // Newly added StateFlows
+    val iicrcAuditsUi by viewModel.iicrcAuditsState.collectAsStateWithLifecycle()
+    val complaintsUi by viewModel.complaintsState.collectAsStateWithLifecycle()
+    val insuranceCarriersUi by viewModel.insuranceCarriersState.collectAsStateWithLifecycle()
+    val clientClaimsUi by viewModel.clientClaimsState.collectAsStateWithLifecycle()
+    val contractorClaimsUi by viewModel.contractorClaimsState.collectAsStateWithLifecycle()
+    val insurerClaimsUi by viewModel.insurerClaimsState.collectAsStateWithLifecycle()
+    val savedPropertiesUi by viewModel.savedPropertiesState.collectAsStateWithLifecycle()
+    val productReviewsUi by viewModel.productReviewsState.collectAsStateWithLifecycle()
+    val equipmentRentalsUi by viewModel.equipmentRentalsState.collectAsStateWithLifecycle()
+    val appSuggestionsUi by viewModel.appSuggestionsState.collectAsStateWithLifecycle()
+    val myHygienistRequestsUi by viewModel.myHygienistRequestsState.collectAsStateWithLifecycle()
+    val openHygienistRequestsUi by viewModel.openHygienistRequestsState.collectAsStateWithLifecycle()
+    val assignedHygienistRequestsUi by viewModel.assignedHygienistRequestsState.collectAsStateWithLifecycle()
+    val myPolicyOffersUi by viewModel.myPolicyOffersState.collectAsStateWithLifecycle()
+    val openPolicyQuotesUi by viewModel.openPolicyQuotesState.collectAsStateWithLifecycle()
+    val insurerPolicyOffersUi by viewModel.insurerPolicyOffersState.collectAsStateWithLifecycle()
+    val fieldScoutAppsUi by viewModel.fieldScoutAppsState.collectAsStateWithLifecycle()
+    val liveDisastersUi by viewModel.liveDisastersState.collectAsStateWithLifecycle()
+    val propertyHistoryState by viewModel.propertyHistoryState.collectAsStateWithLifecycle()
+    val azHomeInspectionState by viewModel.azHomeInspectionState.collectAsStateWithLifecycle()
+    val buildingPhotoAnalysisState by viewModel.buildingPhotoAnalysisState.collectAsStateWithLifecycle()
+    val pestAnalysisState by viewModel.pestAnalysisState.collectAsStateWithLifecycle()
+    val onlineContractorLeadsState by viewModel.onlineContractorLeadsState.collectAsStateWithLifecycle()
+    val selectedSoilFromBottleTest by viewModel.selectedSoilFromBottleTest.collectAsStateWithLifecycle()
+    val fieldScoutLeaderboard by viewModel.fieldScoutLeaderboard.collectAsStateWithLifecycle()
+    val telemetryDiscountPercent by viewModel.userTelemetryDiscountPercent.collectAsStateWithLifecycle()
+    val continuousSnapshot by viewModel.continuousLearningSnapshot.collectAsStateWithLifecycle()
+    val copilotAdviceState by viewModel.copilotAdviceState.collectAsStateWithLifecycle()
+    val cslbCheckState by viewModel.cslbCheckState.collectAsStateWithLifecycle()
+    val iicrcAiCheckState by viewModel.iicrcAiCheckState.collectAsStateWithLifecycle()
+    val liveScanProofAttachment by viewModel.liveScanProofAttachment.collectAsStateWithLifecycle()
+    val complaintProofAttachment by viewModel.complaintProofAttachment.collectAsStateWithLifecycle()
+    val latestFiledComplaint by viewModel.latestFiledComplaint.collectAsStateWithLifecycle()
+
+    val mergedClaims = remember(clientClaimsUi, contractorClaimsUi, insurerClaimsUi) {
+        val c1 = (clientClaimsUi as? UiState.Success)?.data.orEmpty()
+        val c2 = (contractorClaimsUi as? UiState.Success)?.data.orEmpty()
+        val c3 = (insurerClaimsUi as? UiState.Success)?.data.orEmpty()
+        (c1 + c2 + c3).distinctBy { it.id }
+    }
+
     var preselectedReportForPro by remember { mutableStateOf<WaterReport?>(null) }
     var showGuideSheet by remember { mutableStateOf(false) }
     var videoStudioInitialPrompt by remember { mutableStateOf("") }
     var videoStudioInitialSourceType by remember { mutableStateOf("product_ad") }
 
     val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(weatherState.selectedCity, weatherState.latitude, weatherState.longitude) {
+        DisasterAlertManager.updateMonitoredCoordinates(
+            context = context,
+            city = weatherState.selectedCity,
+            lat = weatherState.latitude,
+            lon = weatherState.longitude
+        )
+    }
 
     LaunchedEffect(statusBanner) {
         val msg = statusBanner
@@ -231,256 +293,361 @@ fun WaterTableMainShell(currentUserId: String) {
     }
 
     val pendingCount = (pendingModerationUi as? UiState.Success)?.data?.size ?: 0
+    val cartCount = cartItems.sumOf { it.quantity }
+    val showMainNav = currentRoute != ROUTE_PROFILE && currentRoute != ROUTE_VIDEO_STUDIO
 
-    Scaffold(
-        contentWindowInsets = WindowInsets.safeDrawing,
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = stringResource(R.string.app_name),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "${weatherState.selectedCity} · Hydro & Restoration Watch",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { showGuideSheet = true },
-                        modifier = Modifier.testTag("open_ai_guide_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.SmartToy,
-                            contentDescription = "AI Personal Assistant & Tutorial",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    IconButton(
-                        onClick = { openVideoStudio("", "product_ad") },
-                        modifier = Modifier.testTag("open_video_studio_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Movie,
-                            contentDescription = "AI Video & Photo Studio"
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            navController.navigate(ROUTE_PROFILE) { launchSingleTop = true }
-                        },
-                        modifier = Modifier.testTag("open_profile_button")
-                    ) {
-                        BadgedBox(
-                            badge = {
-                                if (pendingCount > 0) Badge { Text("$pendingCount") }
-                            }
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val useNavRail = maxWidth >= 600.dp
+
+        Scaffold(
+            contentWindowInsets = WindowInsets.safeDrawing,
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(
+                                text = stringResource(R.string.app_name),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "${weatherState.selectedCity} · Hydro, Home & Restoration Watch",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = { showGuideSheet = true },
+                            modifier = Modifier.testTag("open_ai_guide_button")
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.AccountCircle,
-                                contentDescription = "My Profile, Submissions & Moderation"
+                                imageVector = Icons.Filled.SmartToy,
+                                contentDescription = "AI Personal Assistant & Tutorial",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        IconButton(
+                            onClick = { openVideoStudio("", "product_ad") },
+                            modifier = Modifier.testTag("open_video_studio_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Movie,
+                                contentDescription = "AI Video & Photo Studio"
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                navController.navigate(ROUTE_PROFILE) { launchSingleTop = true }
+                            },
+                            modifier = Modifier.testTag("open_profile_button")
+                        ) {
+                            BadgedBox(
+                                badge = {
+                                    if (pendingCount > 0) Badge { Text("$pendingCount") }
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.AccountCircle,
+                                    contentDescription = "My Profile, Scouts, Revisions & Moderation"
+                                )
+                            }
+                        }
+                        IconButton(
+                            onClick = { signOut(credentialManager, scope) },
+                            modifier = Modifier.testTag("sign_out_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Logout,
+                                contentDescription = "Sign out"
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                )
+            },
+            floatingActionButton = {
+                if (showMainNav) {
+                    ExtendedFloatingActionButton(
+                        onClick = { showGuideSheet = true },
+                        icon = { Icon(Icons.Filled.SmartToy, contentDescription = null) },
+                        text = { Text("AI Guide") },
+                        modifier = Modifier.testTag("fab_ai_guide")
+                    )
+                }
+            },
+            bottomBar = {
+                if (showMainNav && !useNavRail) {
+                    NavigationBar {
+                        NavigationBarItem(
+                            selected = currentRoute == ROUTE_ATLAS,
+                            onClick = { navigateTab(ROUTE_ATLAS) },
+                            icon = { Icon(Icons.Filled.Map, contentDescription = "Leaflet Map and flood watch") },
+                            label = { Text("Atlas") },
+                            modifier = Modifier.testTag("nav_atlas")
+                        )
+                        NavigationBarItem(
+                            selected = currentRoute == ROUTE_DIAGNOSE,
+                            onClick = { navigateTab(ROUTE_DIAGNOSE) },
+                            icon = { Icon(Icons.Filled.AddAPhoto, contentDescription = "AI diagnose and report") },
+                            label = { Text("Diagnose") },
+                            modifier = Modifier.testTag("nav_diagnose")
+                        )
+                        NavigationBarItem(
+                            selected = currentRoute == ROUTE_DIY_LEAK,
+                            onClick = { navigateTab(ROUTE_DIY_LEAK) },
+                            icon = { Icon(Icons.Filled.Build, contentDescription = "DIY leak, soil and shutoff guides") },
+                            label = { Text("DIY") },
+                            modifier = Modifier.testTag("nav_diy")
+                        )
+                        NavigationBarItem(
+                            selected = currentRoute == ROUTE_CONTRACTORS,
+                            onClick = { navigateTab(ROUTE_CONTRACTORS) },
+                            icon = { Icon(Icons.Filled.Engineering, contentDescription = "Licensed contractors, IICRC and Insurance") },
+                            label = { Text("Pros") },
+                            modifier = Modifier.testTag("nav_pros")
+                        )
+                        NavigationBarItem(
+                            selected = currentRoute == ROUTE_WHOLESALE,
+                            onClick = { navigateTab(ROUTE_WHOLESALE) },
+                            icon = {
+                                BadgedBox(
+                                    badge = {
+                                        if (cartCount > 0) Badge { Text("$cartCount") }
+                                    }
+                                ) {
+                                    Icon(Icons.Filled.LocalShipping, contentDescription = "Wholesale store and equipment rentals")
+                                }
+                            },
+                            label = { Text("Supply") },
+                            modifier = Modifier.testTag("nav_supply")
+                        )
+                    }
+                }
+            }
+        ) { innerPadding ->
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                if (showMainNav && useNavRail) {
+                    NavigationRail(
+                        modifier = Modifier.fillMaxHeight()
+                    ) {
+                        Spacer(modifier = Modifier.weight(0.2f))
+                        NavigationRailItem(
+                            selected = currentRoute == ROUTE_ATLAS,
+                            onClick = { navigateTab(ROUTE_ATLAS) },
+                            icon = { Icon(Icons.Filled.Map, contentDescription = "Atlas") },
+                            label = { Text("Atlas") }
+                        )
+                        NavigationRailItem(
+                            selected = currentRoute == ROUTE_DIAGNOSE,
+                            onClick = { navigateTab(ROUTE_DIAGNOSE) },
+                            icon = { Icon(Icons.Filled.AddAPhoto, contentDescription = "Diagnose") },
+                            label = { Text("Diagnose") }
+                        )
+                        NavigationRailItem(
+                            selected = currentRoute == ROUTE_DIY_LEAK,
+                            onClick = { navigateTab(ROUTE_DIY_LEAK) },
+                            icon = { Icon(Icons.Filled.Build, contentDescription = "DIY") },
+                            label = { Text("DIY") }
+                        )
+                        NavigationRailItem(
+                            selected = currentRoute == ROUTE_CONTRACTORS,
+                            onClick = { navigateTab(ROUTE_CONTRACTORS) },
+                            icon = { Icon(Icons.Filled.Engineering, contentDescription = "Pros") },
+                            label = { Text("Pros") }
+                        )
+                        NavigationRailItem(
+                            selected = currentRoute == ROUTE_WHOLESALE,
+                            onClick = { navigateTab(ROUTE_WHOLESALE) },
+                            icon = {
+                                BadgedBox(badge = { if (cartCount > 0) Badge { Text("$cartCount") } }) {
+                                    Icon(Icons.Filled.LocalShipping, contentDescription = "Supply")
+                                }
+                            },
+                            label = { Text("Supply") }
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+
+                Box(
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    NavHost(
+                        navController = navController,
+                        startDestination = ROUTE_ATLAS,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .widthIn(max = if (useNavRail) 1040.dp else 720.dp)
+                    ) {
+                        composable(ROUTE_ATLAS) {
+                            AtlasMapScreen(
+                                viewModel = viewModel,
+                                reportsUi = reportsUi,
+                                liveDisastersUi = liveDisastersUi,
+                                savedPropertiesUi = savedPropertiesUi,
+                                propertyHistoryState = propertyHistoryState,
+                                onNavigateToDiagnose = { navigateTab(ROUTE_DIAGNOSE) },
+                                onAskContractorForReport = { report ->
+                                    preselectedReportForPro = report
+                                    viewModel.applyProblemMatchFromReport(report)
+                                    navigateTab(ROUTE_CONTRACTORS)
+                                },
+                                weatherState = weatherState,
+                                riskSummary = riskSummary
+                            )
+                        }
+                        composable(ROUTE_DIAGNOSE) {
+                            DiagnoseReportScreen(
+                                viewModel = viewModel,
+                                weatherState = weatherState,
+                                mediaAttachment = mediaAttachment,
+                                extraPhotos = extraPhotos,
+                                buildingPhotoAttachment = buildingPhotoAttachment,
+                                buildingExtraPhotos = buildingExtraPhotos,
+                                pestPhotoAttachment = pestPhotoAttachment,
+                                pestExtraPhotos = pestExtraPhotos,
+                                aiDiagnosisState = aiDiagnosisState,
+                                azHomeInspectionState = azHomeInspectionState,
+                                buildingPhotoAnalysisState = buildingPhotoAnalysisState,
+                                pestAnalysisState = pestAnalysisState,
+                                selectedSoilFromBottleTest = selectedSoilFromBottleTest,
+                                adaptiveSolutions = adaptiveSolutions,
+                                validationErrors = validationErrors,
+                                isSubmitting = isSubmitting,
+                                onNavigateToContractors = { navigateTab(ROUTE_CONTRACTORS) },
+                                onOpenVideoStudioWithText = { siteText ->
+                                    openVideoStudio(siteText, "site_report")
+                                },
+                                onOpenDiyVideos = { navigateTab(ROUTE_DIY_LEAK) },
+                                onOpenRentals = { navigateTab(ROUTE_WHOLESALE) },
+                                onPublished = { navigateTab(ROUTE_ATLAS) }
+                            )
+                        }
+                        composable(ROUTE_DIY_LEAK) {
+                            DiyLeakScreen(
+                                diyResults = diyResults,
+                                onAnswerChange = { stepId, ans -> viewModel.setDiyTestAnswer(stepId, ans) },
+                                onNavigateToContractors = { eval ->
+                                    viewModel.applyProblemMatchFromDiy(eval.headline, eval.summary)
+                                    navigateTab(ROUTE_CONTRACTORS)
+                                },
+                                onNavigateToWholesale = { navigateTab(ROUTE_WHOLESALE) },
+                                onApplySoilBottleToDiagnose = { soilKey ->
+                                    viewModel.setSelectedSoilTypeFromBottleTest(soilKey)
+                                    navigateTab(ROUTE_DIAGNOSE)
+                                },
+                                onOpenVideoStudioWithPrompt = { promptText ->
+                                    openVideoStudio(promptText, "blog_post")
+                                },
+                                viewModel = viewModel,
+                                city = weatherState.selectedCity,
+                                pestPhotoAttachment = pestPhotoAttachment,
+                                pestExtraPhotos = pestExtraPhotos,
+                                pestAnalysisState = pestAnalysisState,
+                                onNavigateToPestContractors = { navigateTab(ROUTE_CONTRACTORS) }
+                            )
+                        }
+                        composable(ROUTE_CONTRACTORS) {
+                            ContractorsScreen(
+                                viewModel = viewModel,
+                                userProfile = userProfile,
+                                matchedContractors = matchedContractors,
+                                sortedContractors = sortedContractors,
+                                contractorsUi = contractorsUi,
+                                reputations = reputations,
+                                reviewsUi = reviewsUi,
+                                externalGroups = externalGroups,
+                                portfolioUi = portfolioUi,
+                                reportsUi = reportsUi,
+                                clientConsultationsUi = clientConsultationsUi,
+                                contractorInboxUi = contractorInboxUi,
+                                problemMatchQuery = problemMatchQuery,
+                                aiMatchConciergeState = aiMatchConciergeState,
+                                reviewProofAttachment = reviewProofAttachment,
+                                portfolioAttachment = portfolioAttachment,
+                                continuousSnapshot = continuousSnapshot,
+                                iicrcAudits = (iicrcAuditsUi as? UiState.Success)?.data.orEmpty(),
+                                complaints = (complaintsUi as? UiState.Success)?.data.orEmpty(),
+                                insuranceCarriers = (insuranceCarriersUi as? UiState.Success)?.data.orEmpty(),
+                                mergedClaims = mergedClaims,
+                                myPolicyOffers = (myPolicyOffersUi as? UiState.Success)?.data.orEmpty(),
+                                openPolicyQuotes = (openPolicyQuotesUi as? UiState.Success)?.data.orEmpty(),
+                                insurerPolicyOffers = (insurerPolicyOffersUi as? UiState.Success)?.data.orEmpty(),
+                                telemetryDiscountPercent = telemetryDiscountPercent,
+                                myHygienistRequests = (myHygienistRequestsUi as? UiState.Success)?.data.orEmpty(),
+                                openHygienistRequests = (openHygienistRequestsUi as? UiState.Success)?.data.orEmpty(),
+                                assignedHygienistRequests = (assignedHygienistRequestsUi as? UiState.Success)?.data.orEmpty(),
+                                onlineContractorLeadsState = onlineContractorLeadsState,
+                                cslbCheckState = cslbCheckState,
+                                copilotAdviceState = copilotAdviceState,
+                                iicrcAiCheckState = iicrcAiCheckState,
+                                liveScanProofAttachment = liveScanProofAttachment,
+                                complaintProofAttachment = complaintProofAttachment,
+                                latestFiledComplaint = latestFiledComplaint,
+                                defaultCity = weatherState.selectedCity,
+                                preselectedReport = preselectedReportForPro,
+                                onClearPreselectedReport = { preselectedReportForPro = null },
+                                onNavigateToDiagnose = { navigateTab(ROUTE_DIAGNOSE) },
+                                isSubmitting = isSubmitting
+                            )
+                        }
+                        composable(ROUTE_WHOLESALE) {
+                            WholesaleStoreScreen(
+                                viewModel = viewModel,
+                                kitRecommendationState = kitRecState,
+                                cartItems = cartItems,
+                                supplyOrdersUi = supplyOrdersUi,
+                                equipmentRentalsUi = equipmentRentalsUi,
+                                productReviewsUi = productReviewsUi,
+                                defaultCity = weatherState.selectedCity,
+                                isSubmitting = isSubmitting,
+                                onOpenVideoStudioWithProduct = { productCopy ->
+                                    openVideoStudio(productCopy, "product_ad")
+                                }
+                            )
+                        }
+                        composable(ROUTE_PROFILE) {
+                            ProfileScreen(
+                                viewModel = viewModel,
+                                userProfile = userProfile,
+                                myReportsUi = myReportsUi,
+                                clientConsultationsUi = clientConsultationsUi,
+                                reviewsUi = reviewsUi,
+                                supplyOrdersUi = supplyOrdersUi,
+                                pendingModerationUi = pendingModerationUi,
+                                appSuggestionsUi = appSuggestionsUi,
+                                fieldScoutAppsUi = fieldScoutAppsUi,
+                                fieldScoutLeaderboard = fieldScoutLeaderboard,
+                                telemetryDiscountPercent = telemetryDiscountPercent,
+                                aiModerationVerdicts = aiModerationVerdicts,
+                                moderatingTicketId = moderatingTicketId,
+                                defaultCity = weatherState.selectedCity,
+                                isSubmitting = isSubmitting,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(ROUTE_VIDEO_STUDIO) {
+                            VideoStudioScreen(
+                                viewModel = viewModel,
+                                initialPromptText = videoStudioInitialPrompt,
+                                initialSourceType = videoStudioInitialSourceType,
+                                videoReferencePhoto = videoReferencePhoto,
+                                videoStudioState = videoStudioState,
+                                videoStudioProgress = videoStudioProgress,
+                                onBack = { navController.popBackStack() }
                             )
                         }
                     }
-                    IconButton(
-                        onClick = { signOut(credentialManager, scope) },
-                        modifier = Modifier.testTag("sign_out_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Logout,
-                            contentDescription = "Sign out"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        },
-        floatingActionButton = {
-            if (currentRoute != ROUTE_VIDEO_STUDIO && currentRoute != ROUTE_PROFILE) {
-                ExtendedFloatingActionButton(
-                    onClick = { showGuideSheet = true },
-                    icon = { Icon(Icons.Filled.SmartToy, contentDescription = null) },
-                    text = { Text("AI Guide") },
-                    modifier = Modifier.testTag("fab_ai_guide")
-                )
-            }
-        },
-        bottomBar = {
-            if (currentRoute != ROUTE_PROFILE && currentRoute != ROUTE_VIDEO_STUDIO) {
-                NavigationBar {
-                    NavigationBarItem(
-                        selected = currentRoute == ROUTE_ATLAS,
-                        onClick = { navigateTab(ROUTE_ATLAS) },
-                        icon = { Icon(Icons.Filled.Map, contentDescription = "Leaflet Map and flood watch") },
-                        label = { Text("Atlas") },
-                        modifier = Modifier.testTag("nav_atlas")
-                    )
-                    NavigationBarItem(
-                        selected = currentRoute == ROUTE_DIAGNOSE,
-                        onClick = { navigateTab(ROUTE_DIAGNOSE) },
-                        icon = { Icon(Icons.Filled.AddAPhoto, contentDescription = "AI diagnose and report") },
-                        label = { Text("Diagnose") },
-                        modifier = Modifier.testTag("nav_diagnose")
-                    )
-                    NavigationBarItem(
-                        selected = currentRoute == ROUTE_DIY_LEAK,
-                        onClick = { navigateTab(ROUTE_DIY_LEAK) },
-                        icon = { Icon(Icons.Filled.Build, contentDescription = "DIY leak detection") },
-                        label = { Text("DIY Leak") },
-                        modifier = Modifier.testTag("nav_diy")
-                    )
-                    NavigationBarItem(
-                        selected = currentRoute == ROUTE_CONTRACTORS,
-                        onClick = { navigateTab(ROUTE_CONTRACTORS) },
-                        icon = { Icon(Icons.Filled.Engineering, contentDescription = "Licensed contractors") },
-                        label = { Text("Pros") },
-                        modifier = Modifier.testTag("nav_pros")
-                    )
-                    NavigationBarItem(
-                        selected = currentRoute == ROUTE_WHOLESALE,
-                        onClick = { navigateTab(ROUTE_WHOLESALE) },
-                        icon = {
-                            val count = cartItems.sumOf { it.quantity }
-                            BadgedBox(
-                                badge = {
-                                    if (count > 0) Badge { Text("$count") }
-                                }
-                            ) {
-                                Icon(Icons.Filled.LocalShipping, contentDescription = "Wholesale store")
-                            }
-                        },
-                        label = { Text("Supply") },
-                        modifier = Modifier.testTag("nav_supply")
-                    )
-                }
-            }
-        }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.TopCenter
-        ) {
-            NavHost(
-                navController = navController,
-                startDestination = ROUTE_ATLAS,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .widthIn(max = 720.dp)
-            ) {
-                composable(ROUTE_ATLAS) {
-                    AtlasMapScreen(
-                        viewModel = viewModel,
-                        reportsUi = reportsUi,
-                        onNavigateToDiagnose = { navigateTab(ROUTE_DIAGNOSE) },
-                        onAskContractorForReport = { report ->
-                            preselectedReportForPro = report
-                            viewModel.applyProblemMatchFromReport(report)
-                            navigateTab(ROUTE_CONTRACTORS)
-                        },
-                        weatherState = weatherState,
-                        riskSummary = riskSummary
-                    )
-                }
-                composable(ROUTE_DIAGNOSE) {
-                    DiagnoseReportScreen(
-                        viewModel = viewModel,
-                        weatherState = weatherState,
-                        mediaAttachment = mediaAttachment,
-                        extraPhotos = extraPhotos,
-                        aiDiagnosisState = aiDiagnosisState,
-                        adaptiveSolutions = adaptiveSolutions,
-                        validationErrors = validationErrors,
-                        isSubmitting = isSubmitting,
-                        onNavigateToContractors = { navigateTab(ROUTE_CONTRACTORS) },
-                        onOpenVideoStudioWithText = { siteText ->
-                            openVideoStudio(siteText, "site_report")
-                        },
-                        onPublished = { navigateTab(ROUTE_ATLAS) }
-                    )
-                }
-                composable(ROUTE_DIY_LEAK) {
-                    DiyLeakScreen(
-                        diyResults = diyResults,
-                        onAnswerChange = { stepId, ans -> viewModel.setDiyTestAnswer(stepId, ans) },
-                        onNavigateToContractors = { eval ->
-                            viewModel.applyProblemMatchFromDiy(eval.headline, eval.summary)
-                            navigateTab(ROUTE_CONTRACTORS)
-                        },
-                        onNavigateToWholesale = { navigateTab(ROUTE_WHOLESALE) }
-                    )
-                }
-                composable(ROUTE_CONTRACTORS) {
-                    ContractorsScreen(
-                        viewModel = viewModel,
-                        matchedContractors = matchedContractors,
-                        sortedContractors = sortedContractors,
-                        contractorsUi = contractorsUi,
-                        reputations = reputations,
-                        reviewsUi = reviewsUi,
-                        externalGroups = externalGroups,
-                        portfolioUi = portfolioUi,
-                        reportsUi = reportsUi,
-                        clientConsultationsUi = clientConsultationsUi,
-                        contractorInboxUi = contractorInboxUi,
-                        problemMatchQuery = problemMatchQuery,
-                        aiMatchConciergeState = aiMatchConciergeState,
-                        reviewProofAttachment = reviewProofAttachment,
-                        portfolioAttachment = portfolioAttachment,
-                        defaultCity = weatherState.selectedCity,
-                        preselectedReport = preselectedReportForPro,
-                        onClearPreselectedReport = { preselectedReportForPro = null },
-                        isSubmitting = isSubmitting
-                    )
-                }
-                composable(ROUTE_WHOLESALE) {
-                    WholesaleStoreScreen(
-                        viewModel = viewModel,
-                        kitRecommendationState = kitRecState,
-                        cartItems = cartItems,
-                        supplyOrdersUi = supplyOrdersUi,
-                        defaultCity = weatherState.selectedCity,
-                        isSubmitting = isSubmitting,
-                        onOpenVideoStudioWithProduct = { productCopy ->
-                            openVideoStudio(productCopy, "product_ad")
-                        }
-                    )
-                }
-                composable(ROUTE_PROFILE) {
-                    ProfileScreen(
-                        viewModel = viewModel,
-                        userProfile = userProfile,
-                        myReportsUi = myReportsUi,
-                        clientConsultationsUi = clientConsultationsUi,
-                        reviewsUi = reviewsUi,
-                        supplyOrdersUi = supplyOrdersUi,
-                        pendingModerationUi = pendingModerationUi,
-                        aiModerationVerdicts = aiModerationVerdicts,
-                        moderatingTicketId = moderatingTicketId,
-                        defaultCity = weatherState.selectedCity,
-                        isSubmitting = isSubmitting,
-                        onBack = { navController.popBackStack() }
-                    )
-                }
-                composable(ROUTE_VIDEO_STUDIO) {
-                    VideoStudioScreen(
-                        viewModel = viewModel,
-                        initialPromptText = videoStudioInitialPrompt,
-                        initialSourceType = videoStudioInitialSourceType,
-                        videoReferencePhoto = videoReferencePhoto,
-                        videoStudioState = videoStudioState,
-                        videoStudioProgress = videoStudioProgress,
-                        onBack = { navController.popBackStack() }
-                    )
                 }
             }
         }

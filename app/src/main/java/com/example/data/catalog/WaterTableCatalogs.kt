@@ -9,8 +9,11 @@ import com.example.data.model.ContractorReputation
 import com.example.data.model.ContractorReview
 import com.example.data.model.DiyLeakTestStep
 import com.example.data.model.ExternalContractorGlassWallGroup
+import com.example.data.model.FieldScoutRankEntry
+import com.example.data.model.HowToVideoGuide
 import com.example.data.model.IicrcAuditRecord
 import com.example.data.model.ProblemMatchQuery
+import com.example.data.model.SoilBottleResult
 import com.example.data.model.SolutionOutcome
 import com.example.data.model.WaterReport
 import com.example.data.model.WholesaleProduct
@@ -302,6 +305,32 @@ object WaterTableCatalogs {
         )
     }
 
+    val allContractorSpecialties: List<Pair<String, String>> = listOf(
+        "soil_engineer" to "Soil / Geotech Eng.",
+        "structural_engineer" to "Structural Engineer (PE)",
+        "general_engineer" to "Civil / General Eng.",
+        "industrial_hygienist" to "Industrial Hygienist (Air/Tape)",
+        "landscaper" to "Landscaper / Grading",
+        "drainage_contractor" to "French Drain Pro",
+        "water_mitigation" to "Water Mitigation",
+        "mold_remediation" to "Mold Remediation",
+        "smoke_fire_restoration" to "Smoke & Fire",
+        "full_service_restoration" to "Full Restoration",
+        "iicrc_inspector" to "IICRC Governor",
+        "leak_specialist" to "Leak Detection",
+        "plumber" to "Plumber (Repipe/Drain)",
+        "roofer" to "Roofing Contractor",
+        "foundation_specialist" to "Foundation & Slab",
+        "electrician" to "Electrician (Panel/Sump)",
+        "hvac" to "HVAC & Ductwork",
+        "pest_control" to "Pest, Rodent & Termite",
+        "general_contractor" to "General Contractor (B)"
+    )
+
+    fun specialtyLabel(key: String): String =
+        allContractorSpecialties.firstOrNull { it.first == key }?.second
+            ?: key.replace("_", " ").replaceFirstChar { it.uppercase() }
+
     /**
      * Scores and ranks every active contractor against the client's exact problem (peril, keywords,
      * dig depth, construction stage, city/GPS proximity, matching portfolio/referrals, proven success
@@ -318,7 +347,15 @@ object WaterTableCatalogs {
         val lowerText = query.problemText.lowercase()
         val inferredCategory = when {
             query.problemCategory != "auto" -> query.problemCategory
-            listOf("mold", "mildew", "spore", "musty", "black spots", "hepa").any { lowerText.contains(it) } -> "mold_mitigation"
+            listOf("air sample", "tape lift", "hygienist", "spore", "clearance test", "asbestos", "voc").any { lowerText.contains(it) } -> "industrial_hygienist"
+            listOf("structural", "load bearing", "beam", "retaining wall", "settlement crack", "footing crack").any { lowerText.contains(it) } -> "structural_engineer"
+            listOf("roof", "shingle", "flashing", "fascia", "attic leak", "skylight").any { lowerText.contains(it) } -> "roofer"
+            listOf("landscap", "swale", "grading", "yard slope", "berm", "irrigation", "sprinkler").any { lowerText.contains(it) } -> "landscaper"
+            listOf("under sink", "copper", "corrosion", "repipe", "sewer", "toilet", "water heater", "shutoff").any { lowerText.contains(it) } -> "plumber"
+            listOf("foundation", "slab heave", "pier", "underpinning", "crawlspace beam").any { lowerText.contains(it) } -> "foundation_specialist"
+            listOf("breaker", "panel", "gfci", "wiring", "electrical").any { lowerText.contains(it) } -> "electrician"
+            listOf("hvac", "furnace", "ac coil", "condensate", "duct", "vent").any { lowerText.contains(it) } -> "hvac"
+            listOf("mold", "mildew", "musty", "black spots", "hepa").any { lowerText.contains(it) } -> "mold_mitigation"
             listOf("smoke", "fire", "soot", "char", "burnt", "ash", "odor").any { lowerText.contains(it) } -> "smoke_fire"
             listOf("flood", "drywall", "carpet", "standing water", "burst", "extract", "dehumid").any { lowerText.contains(it) } -> "water_restoration"
             listOf("french drain", "trench", "gravel", "catch basin", "yard", "runoff", "downspout", "curtain drain").any { lowerText.contains(it) } -> "drainage_french_drain"
@@ -329,19 +366,29 @@ object WaterTableCatalogs {
         }
 
         val desiredSpecialties = when (inferredCategory) {
-            "mold_mitigation" -> listOf("mold_remediation", "full_service_restoration", "water_mitigation", "iicrc_inspector")
+            "mold_mitigation" -> listOf("mold_remediation", "industrial_hygienist", "full_service_restoration", "water_mitigation", "iicrc_inspector")
+            "industrial_hygienist" -> listOf("industrial_hygienist", "iicrc_inspector", "mold_remediation")
+            "structural_engineer" -> listOf("structural_engineer", "foundation_specialist", "soil_engineer", "general_engineer")
+            "foundation_specialist" -> listOf("foundation_specialist", "structural_engineer", "soil_engineer", "general_contractor")
+            "roofer" -> listOf("roofer", "general_contractor", "water_mitigation")
+            "landscaper" -> listOf("landscaper", "drainage_contractor", "soil_engineer")
+            "plumber" -> listOf("plumber", "leak_specialist", "general_contractor", "water_mitigation")
+            "electrician" -> listOf("electrician", "general_contractor")
+            "hvac" -> listOf("hvac", "general_contractor", "mold_remediation")
+            "pest_control" -> listOf("pest_control", "general_contractor", "structural_engineer", "foundation_specialist")
+            "general_contractor" -> listOf("general_contractor", "full_service_restoration", "general_engineer")
             "smoke_fire", "smoke_damage", "fire_restoration" -> listOf("smoke_fire_restoration", "full_service_restoration", "iicrc_inspector")
             "water_restoration" -> listOf("water_mitigation", "full_service_restoration", "drainage_contractor", "soil_engineer")
-            "drainage_french_drain" -> listOf("drainage_contractor", "soil_engineer", "water_mitigation", "full_service_restoration")
-            "construction_waterproofing", "groundwater" -> listOf("soil_engineer", "drainage_contractor", "general_engineer", "water_mitigation", "full_service_restoration")
-            "plumbing_leak" -> listOf("water_mitigation", "full_service_restoration", "general_engineer")
-            else -> listOf("full_service_restoration", "water_mitigation", "soil_engineer")
+            "drainage_french_drain" -> listOf("drainage_contractor", "landscaper", "soil_engineer", "water_mitigation", "full_service_restoration")
+            "construction_waterproofing", "groundwater" -> listOf("soil_engineer", "drainage_contractor", "general_engineer", "foundation_specialist", "landscaper", "water_mitigation", "full_service_restoration")
+            "plumbing_leak" -> listOf("water_mitigation", "plumber", "leak_specialist", "full_service_restoration", "general_engineer")
+            else -> listOf("full_service_restoration", "general_contractor", "water_mitigation", "soil_engineer")
         }
 
         val targetPortfolioCategory = when (inferredCategory) {
-            "mold_mitigation" -> "mold_mitigation"
+            "mold_mitigation", "industrial_hygienist" -> "mold_mitigation"
             "smoke_fire", "smoke_damage", "fire_restoration" -> "fire_restoration"
-            "water_restoration" -> "water_restoration"
+            "water_restoration", "roofer", "plumber", "plumbing_leak" -> "water_restoration"
             else -> "groundwater"
         }
 
@@ -677,6 +724,288 @@ object WaterTableCatalogs {
             )
         }
     }
+
+    /**
+     * USDA Mason-Jar / Water-Bottle Soil Shake Test Calculator.
+     * Sand settles in ~1 minute, Silt in ~2 hours, Clay over ~24 hours.
+     */
+    fun evaluateSoilBottleTest(sandRaw: Int, siltRaw: Int, clayRaw: Int): SoilBottleResult {
+        val total = (sandRaw + siltRaw + clayRaw).coerceAtLeast(1)
+        val sand = ((sandRaw.toDouble() / total) * 100.0).roundToInt().coerceIn(0, 100)
+        val silt = ((siltRaw.toDouble() / total) * 100.0).roundToInt().coerceIn(0, 100)
+        val clay = (100 - sand - silt).coerceIn(0, 100)
+
+        return when {
+            clay >= 40 -> SoilBottleResult(
+                usdaTextureClass = "Heavy Clay (Expansive)",
+                drainageRating = "Very Slow · Traps Perched Groundwater",
+                mappedSoilTypeKey = "clay",
+                clayPercent = clay,
+                siltPercent = silt,
+                sandPercent = sand,
+                foundationAdvisory = "Clay swells when wet and shrinks when dry, stressing slabs & stem walls. Wrap French drains in non-woven geotextile fabric + washed gravel so fines never clog."
+            )
+            sand >= 68 && clay < 20 -> SoilBottleResult(
+                usdaTextureClass = "Sandy / Fast-Percolating Soil",
+                drainageRating = "Fast Surface Drain · High Aquifer Rise",
+                mappedSoilTypeKey = "sand",
+                clayPercent = clay,
+                siltPercent = silt,
+                sandPercent = sand,
+                foundationAdvisory = "Rain drains quickly, but rising groundwater tables travel effortlessly through sand. Check basement/crawlspace depth before trenching or digging."
+            )
+            silt >= 50 && clay < 35 -> SoilBottleResult(
+                usdaTextureClass = "Silty / Alluvial Soil",
+                drainageRating = "Slow-to-Moderate · Prone to Pipe Silting",
+                mappedSoilTypeKey = "silt",
+                clayPercent = clay,
+                siltPercent = silt,
+                sandPercent = sand,
+                foundationAdvisory = "Fine alluvial silt clogs perforated pipe holes rapidly without filter fabric and easily saturates after 24h storms."
+            )
+            else -> SoilBottleResult(
+                usdaTextureClass = "Balanced Loam / Clay-Loam",
+                drainageRating = "Moderate Drainage",
+                mappedSoilTypeKey = "loam",
+                clayPercent = clay,
+                siltPercent = silt,
+                sandPercent = sand,
+                foundationAdvisory = "Healthy garden drainage when graded away from the foundation (6 in drop over first 10 ft), though persistent storms still elevate seasonal water tables."
+            )
+        }
+    }
+
+    val emergencyWaterShutoffSteps: List<Pair<String, String>> = listOf(
+        "1. House Main Shutoff Valve (Fastest Stop)" to
+            "Check garage wall facing street, front hose bib riser, or basement perimeter. Ball Valve (lever): turn 90° perpendicular to pipe to shut OFF. Gate Valve (round wheel): turn clockwise ('righty-tighty') until snug.",
+        "2. Underground Street Water Meter Box (If House Valve Leaks/Sticks)" to
+            "Locate the concrete/plastic 'WATER' lid near the sidewalk curb. Pry open slowly with a screwdriver or meter key (watch for spiders). Look inside at the brass meter.",
+        "3. Turn the Curb Stop Valve" to
+            "Find the oval brass lug on the street-side of the meter. Use a water meter key or adjustable crescent wrench + screwdriver lever to rotate the lug 90° (quarter turn) until the holes align or cross the pipe. Never force a frozen valve—call city public works emergency line if seized.",
+        "4. Under-Sink & Toilet Angle Stops + Water Heater" to
+            "For localized sink/toilet leaks, turn the small oval chrome handle clockwise 90°–360°. If main house water is off for hours, switch the water heater to Pilot/Vacation or turn off its breaker."
+    )
+
+    val howToVideoGuides: List<HowToVideoGuide> = listOf(
+        HowToVideoGuide(
+            id = "vid_soil_bottle",
+            title = "Water Bottle Soil Shake Test (Sand vs. Silt vs. Clay)",
+            category = "soil_water",
+            durationLabel = "4 min",
+            summary = "Fill a clear bottle 1/3 soil + 2/3 water + 1 drop dish soap, shake 2 min, and measure layers at 1 min, 2 hrs, and 24 hrs.",
+            stepByStepChecklist = listOf(
+                "Dig 6–12 inches down (skip surface mulch/topsoil).",
+                "Fill clear bottle 1/3 full of soil, top with clean water + 1 drop dish soap.",
+                "Mark top of settled sand after 1 minute, silt after 2 hours, clay after 24 hours.",
+                "Enter layer percentages in the Soil Calculator above for instant slab/drainage advice."
+            ),
+            videoSearchUrl = "https://www.youtube.com/results?search_query=mason+jar+soil+texture+test+sand+silt+clay+how+to",
+            videoPromptHint = "Clear glass jar showing three distinct layers of sand at bottom, silt in middle, and cloudy clay water settling cleanly."
+        ),
+        HowToVideoGuide(
+            id = "vid_shutoff_meter",
+            title = "Turn Off Water at House Main & Street Curb Meter Box",
+            category = "shutoff",
+            durationLabel = "3 min",
+            summary = "Stop flooding in 60 seconds: ball valve vs gate valve vs curb meter quarter-turn lug.",
+            stepByStepChecklist = listOf(
+                "Locate house main near front hose bib, garage, or utility room.",
+                "Quarter-turn lever valve 90° perpendicular to pipe.",
+                "If stuck, open concrete curb box with a wrench and rotate brass curb stop lug 90°.",
+                "Open lowest cold faucet indoors to depressurize pipes."
+            ),
+            videoSearchUrl = "https://www.youtube.com/results?search_query=how+to+shut+off+main+water+valve+at+street+meter+and+house",
+            videoPromptHint = "Homeowner opening curb water meter box with a shutoff key and turning a brass main house ball valve 90 degrees."
+        ),
+        HowToVideoGuide(
+            id = "vid_mold_remediation",
+            title = "Safe DIY Mold Remediation Prep & IICRC S520 Containment",
+            category = "mold",
+            durationLabel = "7 min",
+            summary = "Stop spreading spores: 6-mil poly zip barriers, negative air HEPA scrubbing, N95/P100 PPE & never spray straight bleach on porous wood.",
+            stepByStepChecklist = listOf(
+                "Turn off HVAC and tape plastic over vents so spores aren't blown house-wide.",
+                "Tape 6-mil polyethylene sheeting Floor-to-Ceiling; rent HEPA Air Scrubber nearby.",
+                "Fix water source first; remove porous wet drywall 12–24 in past last stain.",
+                "HEPA vacuum framing, damp wipe botanical antimicrobial, dry below 14% wood moisture."
+            ),
+            videoSearchUrl = "https://www.youtube.com/results?search_query=IICRC+S520+mold+remediation+containment+HEPA+scrubber+how+to",
+            videoPromptHint = "Clean plastic poly containment zip-wall with HEPA air scrubber exhaust duct maintaining safe negative pressure inside room."
+        ),
+        HowToVideoGuide(
+            id = "vid_exterior_runoff",
+            title = "Exterior Walkaround: Grading, Swales & Foundation Runoff Check",
+            category = "drainage",
+            durationLabel = "5 min",
+            summary = "Spot negative lot slope, clogged catch basins, and short downspouts pouring water against your slab.",
+            stepByStepChecklist = listOf(
+                "Walk perimeter looking for soil sloping TOWARD stucco/siding.",
+                "Extend downspouts 8–10 ft past the slab edge.",
+                "Check weep screed clearance (must sit 2–4 in above dirt/mulch).",
+                "Film a 10s slow walkaround and upload in Diagnose -> Exterior Video AI."
+            ),
+            videoSearchUrl = "https://www.youtube.com/results?search_query=how+to+check+house+exterior+grading+drainage+french+drain+swale",
+            videoPromptHint = "Residential exterior foundation check showing clean gravel French drain swale sloping gently away from stucco weep screed."
+        ),
+        HowToVideoGuide(
+            id = "vid_undersink_copper",
+            title = "Spot Under-Sink P-Trap Leaks & Exterior Copper Pinhole Corrosion",
+            category = "plumbing_roof",
+            durationLabel = "5 min",
+            summary = "Read blue-green copper patina, slipped compression nuts, and braided hose rust before a burst ruins cabinetry.",
+            stepByStepChecklist = listOf(
+                "Wrap dry paper towel around P-trap & angle stop while running hot water 2 min.",
+                "Check exterior copper risers/hose bibs for chalky green-blue crust (verdigris/corrosion).",
+                "Replace rubber braided supply lines over 8 years old with stainless steel.",
+                "Measure static PSI (<75 PSI recommended; high PSI shreds pipes)."
+            ),
+            videoSearchUrl = "https://www.youtube.com/results?search_query=how+to+find+under+sink+drain+leak+and+copper+pipe+corrosion",
+            videoPromptHint = "Plumbing inspection flashlight showing clean under-sink PVC P-trap and dry stainless braided angle stop valves."
+        ),
+        HowToVideoGuide(
+            id = "vid_roof_attic",
+            title = "Find Hidden Roof Flashing & Skylight Leaks From Attic & Exterior",
+            category = "plumbing_roof",
+            durationLabel = "6 min",
+            summary = "Follow roof decking water trails uphill (leaks travel rafters!) around vents, valleys, and chimney crickets.",
+            stepByStepChecklist = listOf(
+                "Enter attic with bright flashlight on dry morning or during rain.",
+                "Inspect dark water rings on sheathing above drywall ceiling stains.",
+                "Check neoprene vent boot collars on roof (crack every 8–12 yrs in SoCal sun).",
+                "Clear leaf dams in roof valleys before atmospheric rivers arrive."
+            ),
+            videoSearchUrl = "https://www.youtube.com/results?search_query=how+to+find+roof+leak+in+attic+flashing+vent+boot",
+            videoPromptHint = "Attic roof inspection showing clean timber rafters and sealed metal vent pipe flashing under bright inspection light."
+        )
+    )
+
+    fun computeTelemetryInsuranceDiscount(
+        verifiedPropertiesCount: Int,
+        reportsCount: Int,
+        outcomesCount: Int,
+        mitigationScoreBonus: Int = 0
+    ): Int {
+        val raw = (verifiedPropertiesCount * 5) +
+            (reportsCount.coerceAtMost(6) * 2) +
+            (outcomesCount.coerceAtMost(4) * 3) +
+            mitigationScoreBonus
+        return raw.coerceIn(0, 28)
+    }
+
+    fun computeFieldScoutLeaderboard(
+        reports: List<WaterReport>,
+        outcomes: List<SolutionOutcome>
+    ): List<FieldScoutRankEntry> {
+        val reportGroups = reports.groupBy { it.userId.ifBlank { it.authorName } }
+        val outcomesByUser = outcomes.groupBy { it.userId }
+        val entries = reportGroups.map { (uid, userReports) ->
+            val first = userReports.first()
+            val verified = userReports.count { it.moderationStatus == "approved" || it.engineerVerified }
+            val mediaCount = userReports.count { it.mediaType != "none" && it.mediaPreviewBase64.isNotBlank() }
+            val userOutcomes = outcomesByUser[uid]?.size ?: 0
+            val pts = (verified * 25) + (mediaCount * 15) + (userReports.size * 10) + (userOutcomes * 20)
+            val city = userReports.groupingBy { it.city.ifBlank { "Local" } }
+                .eachCount().maxByOrNull { it.value }?.key ?: "Local"
+            FieldScoutRankEntry(
+                rank = 0,
+                userId = uid,
+                displayName = first.authorName.ifBlank { "Community Scout" },
+                city = city,
+                verifiedReportsCount = verified,
+                mediaReportsCount = mediaCount,
+                outcomesLoggedCount = userOutcomes,
+                points = pts,
+                freeSubscriptionEarned = pts >= 60,
+                paidScoutEligible = pts >= 100
+            )
+        }.sortedByDescending { it.points }
+            .mapIndexed { idx, entry -> entry.copy(rank = idx + 1) }
+
+        return entries.take(15)
+    }
+
+    const val DIY_PEST_WEBSITE_NAME = "DoMyOwn.com DIY Pest Control"
+    const val DIY_PEST_WEBSITE_HOME = "https://www.domyown.com/"
+
+    fun buildDoMyOwnSearchUrl(query: String): String {
+        val encoded = java.net.URLEncoder.encode(query.trim().ifBlank { "rodent exclusion mesh" }, "UTF-8")
+        return "https://www.domyown.com/search?w=$encoded"
+    }
+
+    val diyPestSupplyCatalog: List<com.example.data.model.DiyPestSupplyItem> = listOf(
+        com.example.data.model.DiyPestSupplyItem(
+            name = "Copper / Stainless Rodent Exclusion Mesh (Xcluder / Stuf-Fit)",
+            purpose = "Stuff tightly into pipe penetrations, stucco gaps, and weep holes so mice & rats cannot chew through like plain foam.",
+            websiteUrl = "https://www.domyown.com/rodent-exclusion-c-21_567.html",
+            category = "Rodent Seal-Up"
+        ),
+        com.example.data.model.DiyPestSupplyItem(
+            name = "1/4\" Galvanized Hardware Cloth & Metal Flashing",
+            purpose = "Screw or anchor over crawlspace vents, attic gable louvers, and soffit gaps to block rats, squirrels, and raccoons.",
+            websiteUrl = "https://www.domyown.com/search?w=hardware+cloth+exclusion+screen",
+            category = "Rodent Seal-Up"
+        ),
+        com.example.data.model.DiyPestSupplyItem(
+            name = "Elastomeric Sealant & Rodent-Proof Garage Door Threshold",
+            purpose = "Seal exterior conduit seams over copper mesh and close corner daylight gaps under roll-up garage doors.",
+            websiteUrl = "https://www.domyown.com/xcluder-rodent-proof-garage-door-seals-c-21_567_1136.html",
+            category = "Rodent Seal-Up"
+        ),
+        com.example.data.model.DiyPestSupplyItem(
+            name = "Tamper-Resistant Rodent Bait Stations & Snap Traps",
+            purpose = "Knock down active mice/rat pressure outdoors & in attics safely while completing physical seal-up.",
+            websiteUrl = "https://www.domyown.com/rodents-c-21.html",
+            category = "Rodent Traps"
+        ),
+        com.example.data.model.DiyPestSupplyItem(
+            name = "Residual Non-Repellent Termiticide & Foam (Fipronil / Taurus SC)",
+            purpose = "Leaves a long-lasting invisible residual barrier in soil & wood galleries that termites transfer through the colony.",
+            websiteUrl = "https://www.domyown.com/termites-c-3.html",
+            category = "Termite Residual"
+        ),
+        com.example.data.model.DiyPestSupplyItem(
+            name = "Borate Wood Preservative (Bora-Care / Tim-bor)",
+            purpose = "Penetrates bare attic/crawlspace framing & leaves permanent residual protection against drywood termites & wood-decay fungi.",
+            websiteUrl = "https://www.domyown.com/borates-c-3_169.html",
+            category = "Termite Residual"
+        ),
+        com.example.data.model.DiyPestSupplyItem(
+            name = "Exterior In-Ground Termite Bait Stations (Trelona / Advance)",
+            purpose = "Install around the house perimeter every 10–15 ft to intercept and eliminate subterranean termite colonies before they reach the slab.",
+            websiteUrl = "https://www.domyown.com/termite-bait-systems-c-3_171.html",
+            category = "Termite Baiting"
+        ),
+        com.example.data.model.DiyPestSupplyItem(
+            name = "Pro Crack & Crevice Residual Insecticide Kit",
+            purpose = "Targets ants, cockroaches, spiders & moisture pests along baseboards, plumbing chases & exterior foundation perimeter.",
+            websiteUrl = "https://www.domyown.com/pest-control-kits-c-192.html",
+            category = "General Pest"
+        )
+    )
+
+    val termiteComparisonGuide: List<com.example.data.model.TermiteStrategyComparison> = listOf(
+        com.example.data.model.TermiteStrategyComparison(
+            methodTitle = "1. Tenting Only (Structural Fumigation — Sulfuryl Fluoride Gas)",
+            residualProtection = "ZERO RESIDUAL — dissipates completely once tent is removed & cleared.",
+            pros = "Gas reaches hidden drywood termites inside walls, beams, and tight eaves in one event.",
+            cons = "Leaves ZERO chemical residual afterward, so flying drywood swarmers can re-enter the house almost immediately. Requires vacating 2–3 days, double-bagging food/meds, and risks roof tile breakage.",
+            verdict = "Kills today's drywood termites only — does NOT prevent immediate re-infestation."
+        ),
+        com.example.data.model.TermiteStrategyComparison(
+            methodTitle = "2. Localized Hot Spot Treatments (Residual Liquid, Foam & Borates)",
+            residualProtection = "HIGH RESIDUAL (5–10+ years in soil/wood with Fipronil/Borates).",
+            pros = "Leaves lasting residual pesticide that keeps killing foraging & transferring termites long after application, often outperforming tenting alone with no house move-out.",
+            cons = "Only protects treated galleries/perimeters — if widespread unseen drywood colonies exist behind finished drywall, localized drilling can miss a distant pocket.",
+            verdict = "Superior ongoing protection when colonies are accessible or paired with inspection."
+        ),
+        com.example.data.model.TermiteStrategyComparison(
+            methodTitle = "3. Complete 3-Step Protocol: Tent + Interior Hot Spot Residual + Exterior Ground Bait Stations",
+            residualProtection = "FULL PROTECTION — Immediate clear-out + interior wood residual + perimeter soil interception.",
+            pros = "Tenting clears hidden structural drywood pockets; interior Hot Spot residual/borate treatment stops immediate drywood re-entry; exterior in-ground bait stations intercept subterranean colonies outside.",
+            cons = "Higher upfront effort/cost, though prevents repeat tenting bills every few years.",
+            verdict = "Best long-term strategy if a house already requires tenting."
+        )
+    )
 }
 
 data class DiyEvaluation(

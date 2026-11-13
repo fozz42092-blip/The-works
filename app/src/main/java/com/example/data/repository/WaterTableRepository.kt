@@ -5,15 +5,20 @@ import com.example.R
 import com.example.data.catalog.WaterTableCatalogs
 import com.example.data.firebase.OperationType
 import com.example.data.firebase.handleFirestoreError
+import com.example.data.model.AppRevisionSuggestion
 import com.example.data.model.ConsultationRequest
 import com.example.data.model.ContractorComplaint
 import com.example.data.model.ContractorPortfolioItem
 import com.example.data.model.ContractorProfile
 import com.example.data.model.ContractorProductReview
 import com.example.data.model.ContractorReview
+import com.example.data.model.EquipmentRentalItem
+import com.example.data.model.FieldScoutApplication
+import com.example.data.model.HygienistSampleRequest
 import com.example.data.model.IicrcAuditRecord
 import com.example.data.model.InsuranceCarrierProfile
 import com.example.data.model.InsuranceClaimThread
+import com.example.data.model.InsurancePolicyOffer
 import com.example.data.model.ModerationTicket
 import com.example.data.model.SavedMonitoredProperty
 import com.example.data.model.SolutionOutcome
@@ -1089,6 +1094,18 @@ class WaterTableRepository(
         }
     }
 
+    private suspend fun fetchOrCreateUserProfile(): UserProfile {
+        val uid = requireUserId()
+        val existing = getUserProfile().getOrNull()
+        if (existing != null) return existing
+        return UserProfile(
+            id = uid,
+            userId = uid,
+            displayName = (auth.currentUser?.displayName?.takeIf { it.isNotBlank() } ?: "Community Member").take(60),
+            preferredCity = "Sacramento"
+        )
+    }
+
     // --- Wholesale Drop-Ship Supply Orders ---
 
     fun observeMySupplyOrders(): Flow<List<SupplyOrder>> = flow {
@@ -1691,6 +1708,524 @@ class WaterTableRepository(
         }
     }
 
+    // --- Remediation Equipment Rentals (Restoration Companies & Residents) ---
+
+    fun observeEquipmentRentals(): Flow<List<EquipmentRentalItem>> = flow {
+        val uid = requireUserId()
+        val path = COLLECTION_EQUIPMENT_RENTALS
+        emitAll(
+            db.collection(COLLECTION_EQUIPMENT_RENTALS)
+                .snapshots()
+                .map { snapshot ->
+                    snapshot.toObjects(
+                        EquipmentRentalItem::class.java,
+                        DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+                    ).sortedWith(
+                        compareByDescending<EquipmentRentalItem> { it.isAvailable }
+                            .thenByDescending { it.createdAt?.seconds ?: 0L }
+                    )
+                }
+                .catch { error ->
+                    handleFlowError(error, OperationType.LIST, path, uid)
+                    throw error
+                }
+        )
+    }
+
+    suspend fun createEquipmentRental(
+        ownerType: String,
+        companyName: String,
+        equipmentName: String,
+        category: String,
+        city: String,
+        dailyRateUsd: Int,
+        depositUsd: Int,
+        specs: String,
+        contactPhoneOrNote: String
+    ): Result<String> {
+        val uid = requireUserId()
+        val profile = fetchOrCreateUserProfile()
+        val rentalId = "rnt_${UUID.randomUUID().toString().replace("-", "").take(16)}"
+        val docRef = db.collection(COLLECTION_EQUIPMENT_RENTALS).document(rentalId)
+        val payload = mapOf(
+            "ownerUserId" to uid,
+            "ownerName" to profile.displayName.ifBlank { "Community Member" }.take(60),
+            "ownerType" to if (ownerType == "restoration_company") "restoration_company" else "resident",
+            "companyName" to companyName.trim().take(80),
+            "equipmentName" to equipmentName.trim().take(100),
+            "category" to category.trim().take(40).ifBlank { "Dehumidifier" },
+            "city" to city.trim().take(80).ifBlank { profile.preferredCity.ifBlank { "Sacramento" } },
+            "dailyRateUsd" to dailyRateUsd.coerceIn(5, 2500),
+            "depositUsd" to depositUsd.coerceIn(0, 10000),
+            "specs" to specs.trim().take(500),
+            "contactPhoneOrNote" to contactPhoneOrNote.trim().take(120),
+            "isAvailable" to true,
+            "createdAt" to FieldValue.serverTimestamp(),
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        return try {
+            docRef.set(payload).await()
+            Result.success(rentalId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.CREATE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun toggleEquipmentAvailability(rentalId: String, available: Boolean): Result<Unit> {
+        requireUserId()
+        val docRef = db.collection(COLLECTION_EQUIPMENT_RENTALS).document(rentalId)
+        return try {
+            docRef.update(
+                mapOf(
+                    "isAvailable" to available,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteEquipmentRental(rentalId: String): Result<Unit> {
+        requireUserId()
+        val docRef = db.collection(COLLECTION_EQUIPMENT_RENTALS).document(rentalId)
+        return try {
+            docRef.delete().await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.DELETE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
+    // --- Contractor & Community App Revision Suggestions ---
+
+    fun observeAppRevisionSuggestions(): Flow<List<AppRevisionSuggestion>> = flow {
+        val uid = requireUserId()
+        val path = COLLECTION_APP_SUGGESTIONS
+        emitAll(
+            db.collection(COLLECTION_APP_SUGGESTIONS)
+                .snapshots()
+                .map { snapshot ->
+                    snapshot.toObjects(
+                        AppRevisionSuggestion::class.java,
+                        DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+                    ).sortedWith(
+                        compareByDescending<AppRevisionSuggestion> { it.upvotesCount }
+                            .thenByDescending { it.createdAt?.seconds ?: 0L }
+                    )
+                }
+                .catch { error ->
+                    handleFlowError(error, OperationType.LIST, path, uid)
+                    throw error
+                }
+        )
+    }
+
+    suspend fun submitAppRevisionSuggestion(
+        authorRole: String,
+        tradeOrSpecialty: String,
+        title: String,
+        category: String,
+        description: String
+    ): Result<String> {
+        val uid = requireUserId()
+        val profile = fetchOrCreateUserProfile()
+        val sugId = "sug_${UUID.randomUUID().toString().replace("-", "").take(16)}"
+        val docRef = db.collection(COLLECTION_APP_SUGGESTIONS).document(sugId)
+        val validCategory = if (category in listOf("Workflow", "AI Diagnostics", "Safety & Licensing", "Insurance", "Equipment & DIY")) {
+            category
+        } else "Workflow"
+        val validRole = if (authorRole in listOf("contractor", "resident", "insurer", "iicrc_inspector")) {
+            authorRole
+        } else "resident"
+        val payload = mapOf(
+            "userId" to uid,
+            "authorName" to profile.displayName.ifBlank { "Community Member" }.take(60),
+            "authorRole" to validRole,
+            "tradeOrSpecialty" to tradeOrSpecialty.trim().take(60),
+            "title" to title.trim().take(120),
+            "category" to validCategory,
+            "description" to description.trim().take(1200),
+            "upvotesCount" to 0,
+            "status" to "submitted",
+            "createdAt" to FieldValue.serverTimestamp(),
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        return try {
+            docRef.set(payload).await()
+            Result.success(sugId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.CREATE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun upvoteAppRevisionSuggestion(suggestionId: String, currentVotes: Int): Result<Unit> {
+        requireUserId()
+        val docRef = db.collection(COLLECTION_APP_SUGGESTIONS).document(suggestionId)
+        return try {
+            docRef.update(
+                mapOf(
+                    "upvotesCount" to (currentVotes + 1),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
+    // --- Industrial Hygienist Air & Tape Sampling Requests ---
+
+    fun observeMyHygienistRequests(): Flow<List<HygienistSampleRequest>> = flow {
+        val uid = requireUserId()
+        val path = COLLECTION_HYGIENIST_REQUESTS
+        emitAll(
+            db.collection(COLLECTION_HYGIENIST_REQUESTS)
+                .whereEqualTo("clientUserId", uid)
+                .snapshots()
+                .map { snapshot ->
+                    snapshot.toObjects(
+                        HygienistSampleRequest::class.java,
+                        DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+                    ).sortedByDescending { it.createdAt?.seconds ?: 0L }
+                }
+                .catch { error ->
+                    handleFlowError(error, OperationType.LIST, path, uid)
+                    throw error
+                }
+        )
+    }
+
+    fun observeOpenHygienistMarketplace(): Flow<List<HygienistSampleRequest>> = flow {
+        val uid = requireUserId()
+        val path = COLLECTION_HYGIENIST_REQUESTS
+        emitAll(
+            db.collection(COLLECTION_HYGIENIST_REQUESTS)
+                .whereEqualTo("hygienistUserId", "open_marketplace")
+                .snapshots()
+                .map { snapshot ->
+                    snapshot.toObjects(
+                        HygienistSampleRequest::class.java,
+                        DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+                    ).sortedByDescending { it.createdAt?.seconds ?: 0L }
+                }
+                .catch { error ->
+                    handleFlowError(error, OperationType.LIST, path, uid)
+                    throw error
+                }
+        )
+    }
+
+    fun observeAssignedHygienistRequests(): Flow<List<HygienistSampleRequest>> = flow {
+        val uid = requireUserId()
+        val path = COLLECTION_HYGIENIST_REQUESTS
+        emitAll(
+            db.collection(COLLECTION_HYGIENIST_REQUESTS)
+                .whereEqualTo("hygienistUserId", uid)
+                .snapshots()
+                .map { snapshot ->
+                    snapshot.toObjects(
+                        HygienistSampleRequest::class.java,
+                        DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+                    ).sortedByDescending { it.createdAt?.seconds ?: 0L }
+                }
+                .catch { error ->
+                    handleFlowError(error, OperationType.LIST, path, uid)
+                    throw error
+                }
+        )
+    }
+
+    suspend fun createHygienistSampleRequest(
+        city: String,
+        propertyAddressHint: String,
+        sampleTypes: List<String>,
+        reasonNotes: String
+    ): Result<String> {
+        val uid = requireUserId()
+        val profile = fetchOrCreateUserProfile()
+        val reqId = "hyg_${UUID.randomUUID().toString().replace("-", "").take(16)}"
+        val docRef = db.collection(COLLECTION_HYGIENIST_REQUESTS).document(reqId)
+        val cleanSamples = sampleTypes.map { it.trim() }.filter { it.isNotBlank() }.take(6)
+            .ifEmpty { listOf("Air Spore Trap", "Surface Tape Lift") }
+        val payload = mapOf(
+            "clientUserId" to uid,
+            "clientName" to profile.displayName.ifBlank { "Homeowner" }.take(60),
+            "hygienistUserId" to "open_marketplace",
+            "hygienistName" to "",
+            "city" to city.trim().take(80).ifBlank { profile.preferredCity.ifBlank { "Sacramento" } },
+            "propertyAddressHint" to propertyAddressHint.trim().take(160),
+            "sampleTypes" to cleanSamples,
+            "reasonNotes" to reasonNotes.trim().take(800),
+            "status" to "requested",
+            "quotedFeeUsd" to 0,
+            "labFindingsSummary" to "",
+            "createdAt" to FieldValue.serverTimestamp(),
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        return try {
+            docRef.set(payload).await()
+            Result.success(reqId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.CREATE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun claimOrUpdateHygienistRequest(
+        requestId: String,
+        hygienistName: String,
+        status: String,
+        quotedFeeUsd: Int,
+        labFindingsSummary: String
+    ): Result<Unit> {
+        val uid = requireUserId()
+        val docRef = db.collection(COLLECTION_HYGIENIST_REQUESTS).document(requestId)
+        val validStatus = if (status in listOf("accepted", "sampled", "lab_report_ready")) status else "accepted"
+        return try {
+            docRef.update(
+                mapOf(
+                    "hygienistUserId" to uid,
+                    "hygienistName" to hygienistName.trim().take(60).ifBlank { "Certified Industrial Hygienist" },
+                    "status" to validStatus,
+                    "quotedFeeUsd" to quotedFeeUsd.coerceIn(0, 15000),
+                    "labFindingsSummary" to labFindingsSummary.trim().take(1500),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
+    // --- Direct In-App Insurance Policies & Telemetry Rate Discounts ---
+
+    fun observeMyClientPolicyOffers(): Flow<List<InsurancePolicyOffer>> = flow {
+        val uid = requireUserId()
+        val path = COLLECTION_INSURANCE_POLICIES
+        emitAll(
+            db.collection(COLLECTION_INSURANCE_POLICIES)
+                .whereEqualTo("clientUserId", uid)
+                .snapshots()
+                .map { snapshot ->
+                    snapshot.toObjects(
+                        InsurancePolicyOffer::class.java,
+                        DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+                    ).sortedByDescending { it.createdAt?.seconds ?: 0L }
+                }
+                .catch { error ->
+                    handleFlowError(error, OperationType.LIST, path, uid)
+                    throw error
+                }
+        )
+    }
+
+    fun observeOpenInsuranceQuotes(): Flow<List<InsurancePolicyOffer>> = flow {
+        val uid = requireUserId()
+        val path = COLLECTION_INSURANCE_POLICIES
+        emitAll(
+            db.collection(COLLECTION_INSURANCE_POLICIES)
+                .whereEqualTo("clientUserId", "open_quote")
+                .snapshots()
+                .map { snapshot ->
+                    snapshot.toObjects(
+                        InsurancePolicyOffer::class.java,
+                        DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+                    ).sortedByDescending { it.createdAt?.seconds ?: 0L }
+                }
+                .catch { error ->
+                    handleFlowError(error, OperationType.LIST, path, uid)
+                    throw error
+                }
+        )
+    }
+
+    fun observeInsurerIssuedPolicies(): Flow<List<InsurancePolicyOffer>> = flow {
+        val uid = requireUserId()
+        val path = COLLECTION_INSURANCE_POLICIES
+        emitAll(
+            db.collection(COLLECTION_INSURANCE_POLICIES)
+                .whereEqualTo("insurerUserId", uid)
+                .snapshots()
+                .map { snapshot ->
+                    snapshot.toObjects(
+                        InsurancePolicyOffer::class.java,
+                        DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+                    ).sortedByDescending { it.createdAt?.seconds ?: 0L }
+                }
+                .catch { error ->
+                    handleFlowError(error, OperationType.LIST, path, uid)
+                    throw error
+                }
+        )
+    }
+
+    suspend fun createOrRequestInsurancePolicy(
+        isCarrierIssuingQuote: Boolean,
+        insurerUserId: String,
+        carrierName: String,
+        targetClientUserId: String,
+        targetClientName: String,
+        propertyLabel: String,
+        city: String,
+        coverageType: String,
+        coverageLimitUsd: Int,
+        deductibleUsd: Int,
+        baseMonthlyPremiumUsd: Int,
+        telemetryDiscountPercent: Int,
+        policyTermsSummary: String
+    ): Result<String> {
+        val uid = requireUserId()
+        val profile = fetchOrCreateUserProfile()
+        val polId = "pol_${UUID.randomUUID().toString().replace("-", "").take(16)}"
+        val docRef = db.collection(COLLECTION_INSURANCE_POLICIES).document(polId)
+        val safeBase = baseMonthlyPremiumUsd.coerceIn(10, 25000)
+        val safeDisc = telemetryDiscountPercent.coerceIn(0, 45)
+        val discounted = ((safeBase * (100 - safeDisc)) / 100).coerceAtLeast(10)
+        val validCov = if (coverageType in listOf("homeowners_ho3", "flood_nfip", "wildfire_dic", "landlord")) {
+            coverageType
+        } else "homeowners_ho3"
+        val payload = mapOf(
+            "insurerUserId" to if (isCarrierIssuingQuote) uid else insurerUserId.ifBlank { "external_carrier" },
+            "carrierName" to carrierName.trim().take(100).ifBlank { "Partner Carrier" },
+            "clientUserId" to if (isCarrierIssuingQuote) targetClientUserId.ifBlank { "open_quote" } else uid,
+            "clientName" to if (isCarrierIssuingQuote) targetClientName.trim().take(60) else profile.displayName.ifBlank { "Homeowner" }.take(60),
+            "propertyLabel" to propertyLabel.trim().take(120).ifBlank { "Primary Residence" },
+            "city" to city.trim().take(80).ifBlank { profile.preferredCity.ifBlank { "Sacramento" } },
+            "coverageType" to validCov,
+            "coverageLimitUsd" to coverageLimitUsd.coerceIn(10000, 10000000),
+            "deductibleUsd" to deductibleUsd.coerceIn(0, 100000),
+            "baseMonthlyPremiumUsd" to safeBase,
+            "telemetryDiscountPercent" to safeDisc,
+            "discountedMonthlyPremiumUsd" to discounted,
+            "policyTermsSummary" to policyTermsSummary.trim().take(1000),
+            "status" to if (isCarrierIssuingQuote) "quoted" else "requested",
+            "createdAt" to FieldValue.serverTimestamp(),
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        return try {
+            docRef.set(payload).await()
+            Result.success(polId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.CREATE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun respondToInsurancePolicyOffer(
+        policyId: String,
+        newStatus: String,
+        asClientAccepting: Boolean
+    ): Result<Unit> {
+        val uid = requireUserId()
+        val profile = fetchOrCreateUserProfile()
+        val docRef = db.collection(COLLECTION_INSURANCE_POLICIES).document(policyId)
+        val updates = if (asClientAccepting) {
+            mapOf(
+                "clientUserId" to uid,
+                "clientName" to profile.displayName.ifBlank { "Homeowner" }.take(60),
+                "status" to if (newStatus == "client_accepted") "client_accepted" else "declined",
+                "updatedAt" to FieldValue.serverTimestamp()
+            )
+        } else {
+            mapOf(
+                "status" to if (newStatus in listOf("quoted", "bound", "declined")) newStatus else "bound",
+                "updatedAt" to FieldValue.serverTimestamp()
+            )
+        }
+        return try {
+            docRef.update(updates).await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
+    // --- Top User Paid Town Field Scout Applications ---
+
+    fun observeMyFieldScoutApplications(): Flow<List<FieldScoutApplication>> = flow {
+        val uid = requireUserId()
+        val path = COLLECTION_FIELD_SCOUT_APPS
+        emitAll(
+            db.collection(COLLECTION_FIELD_SCOUT_APPS)
+                .whereEqualTo("userId", uid)
+                .snapshots()
+                .map { snapshot ->
+                    snapshot.toObjects(
+                        FieldScoutApplication::class.java,
+                        DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+                    ).sortedByDescending { it.createdAt?.seconds ?: 0L }
+                }
+                .catch { error ->
+                    handleFlowError(error, OperationType.LIST, path, uid)
+                    throw error
+                }
+        )
+    }
+
+    suspend fun submitFieldScoutApplication(
+        applicantName: String,
+        city: String,
+        scoutScore: Int,
+        verifiedReportsCount: Int,
+        availabilitySummary: String,
+        coverageNotes: String
+    ): Result<String> {
+        val uid = requireUserId()
+        val profile = fetchOrCreateUserProfile()
+        val appId = "sct_${UUID.randomUUID().toString().replace("-", "").take(16)}"
+        val docRef = db.collection(COLLECTION_FIELD_SCOUT_APPS).document(appId)
+        val payload = mapOf(
+            "userId" to uid,
+            "applicantName" to applicantName.trim().take(60).ifBlank { profile.displayName.ifBlank { "Field Scout" } },
+            "city" to city.trim().take(80).ifBlank { profile.preferredCity.ifBlank { "Sacramento" } },
+            "scoutScore" to scoutScore.coerceIn(0, 1000000),
+            "verifiedReportsCount" to verifiedReportsCount.coerceIn(0, 100000),
+            "availabilitySummary" to availabilitySummary.trim().take(300).ifBlank { "Weekdays & weekends" },
+            "coverageNotes" to coverageNotes.trim().take(800),
+            "status" to "applied",
+            "createdAt" to FieldValue.serverTimestamp(),
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        return try {
+            docRef.set(payload).await()
+            Result.success(appId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.CREATE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
     companion object {
         const val COLLECTION_USERS = "users"
         const val COLLECTION_REPORTS = "water_reports"
@@ -1707,6 +2242,11 @@ class WaterTableRepository(
         const val COLLECTION_INSURANCE_CLAIMS = "insurance_claims"
         const val COLLECTION_SAVED_PROPERTIES = "saved_properties"
         const val COLLECTION_PRODUCT_REVIEWS = "contractor_product_reviews"
+        const val COLLECTION_EQUIPMENT_RENTALS = "equipment_rentals"
+        const val COLLECTION_APP_SUGGESTIONS = "app_revision_suggestions"
+        const val COLLECTION_HYGIENIST_REQUESTS = "hygienist_requests"
+        const val COLLECTION_INSURANCE_POLICIES = "insurance_policies"
+        const val COLLECTION_FIELD_SCOUT_APPS = "field_scout_applications"
         const val PLATFORM_FEE_PERCENT = 10
     }
 }

@@ -3,6 +3,7 @@ package com.example.ui.screens
 import android.Manifest
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -29,11 +30,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AddLocationAlt
+import androidx.compose.material.icons.filled.BatterySaver
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Construction
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Engineering
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.HomeWork
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Newspaper
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ThumbUp
@@ -47,10 +55,12 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -70,16 +80,22 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.model.FloodRiskLevel
+import com.example.data.model.LiveDisasterEvent
 import com.example.data.model.LocalFloodNewsItem
 import com.example.data.model.NwsAlert
+import com.example.data.model.PropertyHazardHistory
+import com.example.data.model.SavedMonitoredProperty
 import com.example.data.model.WaterReport
+import com.example.notifications.DisasterAlertManager
 import com.example.ui.UiState
 import com.example.ui.WaterTableViewModel
 import com.example.ui.components.Base64MediaPreview
@@ -91,23 +107,56 @@ import com.example.ui.components.RiskLevelBadge
 import com.example.ui.components.VerdictBadge
 import com.example.ui.theme.FloodAmber
 import com.example.ui.theme.FloodCrimson
+import com.example.ui.theme.SafeEmerald
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AtlasMapScreen(
     viewModel: WaterTableViewModel,
     reportsUi: UiState<List<WaterReport>>,
+    liveDisastersUi: UiState<List<LiveDisasterEvent>> = UiState.Loading,
+    savedPropertiesUi: UiState<List<SavedMonitoredProperty>> = UiState.Success(emptyList()),
+    propertyHistoryState: UiState<PropertyHazardHistory>? = null,
     onNavigateToDiagnose: () -> Unit,
     onAskContractorForReport: (WaterReport) -> Unit,
     weatherState: com.example.ui.WeatherNewsUiState,
     riskSummary: com.example.data.model.StreetFloodRiskSummary
 ) {
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     var citySearchQuery by remember { mutableStateOf("") }
     var showCitySearchDialog by remember { mutableStateOf(false) }
     var selectedReport by remember { mutableStateOf<WaterReport?>(null) }
     var outcomeTargetReport by remember { mutableStateOf<WaterReport?>(null) }
     var cityFilterOnly by remember { mutableStateOf(false) }
+
+    // Background low-battery priority alert state
+    var monitoringEnabled by remember { mutableStateOf(DisasterAlertManager.isMonitoringEnabled(context)) }
+    var intervalHours by remember { mutableIntStateOf(DisasterAlertManager.getIntervalHours(context)) }
+
+    // Property Hazard & Pre-House Land History lookup state
+    var propLabel by remember { mutableStateOf("My Home") }
+    var propType by remember { mutableStateOf("house") }
+    var propAddressQuery by remember { mutableStateOf("") }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            monitoringEnabled = true
+            DisasterAlertManager.schedulePeriodicMonitoring(
+                context = context,
+                intervalHours = intervalHours,
+                city = weatherState.selectedCity,
+                lat = weatherState.latitude,
+                lon = weatherState.longitude
+            )
+            viewModel.setStatusBanner("Low-battery priority hazard alerts enabled every ${intervalHours}h!")
+        } else {
+            monitoringEnabled = false
+            viewModel.setStatusBanner("Notification permission denied — allow Notifications in Settings for priority alerts.")
+        }
+    }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -117,7 +166,7 @@ fun AtlasMapScreen(
         if (granted) {
             viewModel.refreshWithLiveGps()
         } else {
-            viewModel.setStatusBanner("Location permission denied. Search any city/town manually.")
+            viewModel.setStatusBanner("Device Location (GPS) permission denied — allow Location in Settings or search any city/town manually.")
         }
     }
 
@@ -126,6 +175,8 @@ fun AtlasMapScreen(
         if (!cityFilterOnly) allReports
         else allReports.filter { it.city.contains(weatherState.selectedCity, ignoreCase = true) }
     }
+    val liveDisasters = (liveDisastersUi as? UiState.Success)?.data.orEmpty()
+    val savedProperties = (savedPropertiesUi as? UiState.Success)?.data.orEmpty()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -196,6 +247,49 @@ fun AtlasMapScreen(
                         Icon(Icons.Filled.Refresh, contentDescription = "Refresh live forecast and news")
                     }
                 }
+            }
+        }
+
+        // Free During Beta + Town Field Scout Perks Banner
+        item {
+            Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("BETA ACCESS: FREE FOR ALL USERS", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Top town mappers earn free lifetime access, paid Field Scout gigs & up to 28% insurance telemetry discounts.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        }
+
+        // Quick-Launch AI House & Building Photo Inspector CTA
+        item {
+            FilledTonalButton(
+                onClick = onNavigateToDiagnose,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .testTag("atlas_quick_scan_building_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.CameraAlt,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Snap / Upload Any House or Building Photo for AI Review")
             }
         }
 
@@ -297,7 +391,7 @@ fun AtlasMapScreen(
             }
         }
 
-        // Interactive Leaflet GPS Map + Clickable Dig Depth & Construction Stage Sheet
+        // Interactive Leaflet GPS Map (with Live Wildfires, Floods & Saved Properties)
         item {
             InteractiveLeafletHydroMap(
                 centerLat = weatherState.latitude,
@@ -306,7 +400,9 @@ fun AtlasMapScreen(
                 reports = filteredReports,
                 selectedReportId = selectedReport?.id,
                 riskLevel = riskSummary.riskLevel,
-                onSelectReport = { selectedReport = it }
+                onSelectReport = { selectedReport = it },
+                liveDisasters = liveDisasters,
+                savedProperties = savedProperties
             )
 
             selectedReport?.let { pinned ->
@@ -316,6 +412,281 @@ fun AtlasMapScreen(
                     onClose = { selectedReport = null },
                     onAskContractor = { onAskContractorForReport(pinned) }
                 )
+            }
+        }
+
+        // Low-Battery Background Priority Notifications Card
+        item {
+            Card(shape = RoundedCornerShape(18.dp)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Filled.NotificationsActive, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Column {
+                                Text("Priority Hazard & Storm Alerts", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = "Low-battery WorkManager watch (skips run when battery is low).",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = monitoringEnabled,
+                            onCheckedChange = { enable ->
+                                if (enable) {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                        !DisasterAlertManager.hasNotificationPermission(context)
+                                    ) {
+                                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    } else {
+                                        monitoringEnabled = true
+                                        DisasterAlertManager.schedulePeriodicMonitoring(
+                                            context = context,
+                                            intervalHours = intervalHours,
+                                            city = weatherState.selectedCity,
+                                            lat = weatherState.latitude,
+                                            lon = weatherState.longitude
+                                        )
+                                        viewModel.setStatusBanner("Background priority hazard alerts scheduled every ${intervalHours}h.")
+                                    }
+                                } else {
+                                    monitoringEnabled = false
+                                    DisasterAlertManager.cancelPeriodicMonitoring(context)
+                                    viewModel.setStatusBanner("Background alerts paused.")
+                                }
+                            }
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Filled.BatterySaver, contentDescription = null, tint = SafeEmerald, modifier = Modifier.size(16.dp))
+                        listOf(1, 3, 6).forEach { hrs ->
+                            FilterChip(
+                                selected = intervalHours == hrs,
+                                onClick = {
+                                    intervalHours = hrs
+                                    if (monitoringEnabled) {
+                                        DisasterAlertManager.schedulePeriodicMonitoring(
+                                            context = context,
+                                            intervalHours = hrs,
+                                            city = weatherState.selectedCity,
+                                            lat = weatherState.latitude,
+                                            lon = weatherState.longitude
+                                        )
+                                    }
+                                },
+                                label = { Text("${hrs}h") }
+                            )
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                        TextButton(
+                            onClick = {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                    !DisasterAlertManager.hasNotificationPermission(context)
+                                ) {
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    DisasterAlertManager.postPriorityAlertNotification(
+                                        context = context,
+                                        title = "Insights Priority Watch (${weatherState.selectedCity})",
+                                        body = "Monitoring ${savedProperties.size} saved property(s), flood zones & nearby wildfires."
+                                    )
+                                }
+                            }
+                        ) {
+                            Text("Test Alert")
+                        }
+                    }
+                }
+            }
+        }
+
+        // Live Wildfires & Floods + GPS Proximity Ratio & Cleanse Protocols
+        item {
+            Card(shape = RoundedCornerShape(18.dp)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Filled.LocalFireDepartment, contentDescription = null, tint = FloodAmber)
+                            Text("Live Disasters & Home Distance Ratio", style = MaterialTheme.typography.titleMedium)
+                        }
+                        TextButton(onClick = { viewModel.refreshLiveDisastersNow() }) {
+                            Text("Refresh")
+                        }
+                    }
+
+                    when (liveDisastersUi) {
+                        UiState.Loading -> LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        is UiState.Error -> Text(liveDisastersUi.message, style = MaterialTheme.typography.bodySmall, color = FloodCrimson)
+                        is UiState.Success -> {
+                            if (liveDisasters.isEmpty()) {
+                                Text(
+                                    text = "No active wildfires or flood warnings near ${weatherState.selectedCity} / saved properties right now.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = SafeEmerald
+                                )
+                            } else {
+                                liveDisasters.take(5).forEach { event ->
+                                    Surface(
+                                        color = if (event.type == "wildfire") Color(0xFFFEF3C7) else Color(0xFFE0F2FE),
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                                Text("${event.type.uppercase()} · ${event.title}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                                Text(event.severity, style = MaterialTheme.typography.labelSmall, color = FloodCrimson, fontWeight = FontWeight.Bold)
+                                            }
+                                            if (event.distanceRatioLabel.isNotBlank()) {
+                                                Text(event.distanceRatioLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                                            }
+                                            Text(event.details, style = MaterialTheme.typography.bodySmall)
+                                            if (event.recommendedCleanseProtocol.isNotBlank()) {
+                                                Text(
+                                                    text = "Cleanse & Mitigation Protocol: ${event.recommendedCleanseProtocol}",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = SafeEmerald
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // House / Business History, FEMA Flood/Fire Zone, Elevation & Pre-House Land Lookup
+        item {
+            Card(shape = RoundedCornerShape(18.dp)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Filled.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Text("Property Hazard, Elevation & Pre-House Land History", style = MaterialTheme.typography.titleMedium)
+                    }
+                    Text(
+                        text = "Buying or inspecting a home or business? Check FEMA flood zone, fire hazard zone, elevation, 5-yr Mother Nature storms & what the land was before the house was built.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = propType == "house", onClick = { propType = "house" }, label = { Text("House / Pre-Buy") })
+                        FilterChip(selected = propType == "business", onClick = { propType = "business" }, label = { Text("Business / Commercial") })
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = propLabel,
+                            onValueChange = { propLabel = it },
+                            label = { Text("Label") },
+                            singleLine = true,
+                            modifier = Modifier.weight(0.8f)
+                        )
+                        OutlinedTextField(
+                            value = propAddressQuery,
+                            onValueChange = { propAddressQuery = it },
+                            label = { Text("Street address, city, or ZIP") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1.4f).testTag("property_history_address_input")
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            viewModel.lookupAddressAndGenerateHistory(
+                                label = propLabel,
+                                propertyType = propType,
+                                addressQuery = propAddressQuery.ifBlank { "${weatherState.selectedCity}, ${weatherState.selectedState}" }
+                            )
+                        },
+                        enabled = propertyHistoryState !is UiState.Loading,
+                        modifier = Modifier.fillMaxWidth().height(48.dp).testTag("lookup_property_history_button")
+                    ) {
+                        Text("Lookup FEMA Zones, Elevation & Land History")
+                    }
+
+                    when (propertyHistoryState) {
+                        UiState.Loading -> LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        is UiState.Error -> Text(propertyHistoryState.message, color = FloodCrimson, style = MaterialTheme.typography.bodySmall)
+                        is UiState.Success -> {
+                            val h = propertyHistoryState.data
+                            Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text("${h.label} · ${h.city}, ${h.state}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                                    Text("FEMA Flood Zone: ${h.femaFloodZone} (${h.floodZoneRisk})", style = MaterialTheme.typography.labelLarge)
+                                    Text("Fire Hazard Zone: ${h.fireHazardZone}", style = MaterialTheme.typography.labelLarge, color = FloodAmber)
+                                    Text("Elevation: ${h.elevationFeet} ft · 5-Yr Heavy Storm Days: ${h.historicalStormCount} · Nearby Shallow Pins: ${h.nearbyShallowReportsCount}", style = MaterialTheme.typography.labelSmall)
+                                    if (h.landBeforeHouseBuilt.isNotBlank()) {
+                                        Text("Before House Was Built (${h.neighborhoodEra}): ${h.landBeforeHouseBuilt}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                                    }
+                                    if (h.motherNatureHistory.isNotBlank()) {
+                                        Text("Mother Nature History: ${h.motherNatureHistory}", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    if (h.erosionComparisonNotes.isNotBlank()) {
+                                        Text("Erosion & Satellite Watch: ${h.erosionComparisonNotes}", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    Text(h.aiHistoricalDossier, style = MaterialTheme.typography.bodySmall)
+                                    h.creditLinks.forEach { link ->
+                                        Text(
+                                            text = "↗ ${link.title} (${link.domain})",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            textDecoration = TextDecoration.Underline,
+                                            modifier = Modifier.clickable { runCatching { uriHandler.openUri(link.url) } }
+                                        )
+                                    }
+                                    Button(
+                                        onClick = { viewModel.saveMonitoredPropertyFromHistory(h) },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(Icons.Filled.HomeWork, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Save & Monitor Property for Priority Alerts")
+                                    }
+                                }
+                            }
+                        }
+                        null -> Unit
+                    }
+
+                    if (savedProperties.isNotEmpty()) {
+                        HorizontalDivider()
+                        Text("Monitored Homes & Businesses (${savedProperties.size})", style = MaterialTheme.typography.labelLarge)
+                        savedProperties.forEach { prop ->
+                            Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("${prop.label} (${prop.city})", style = MaterialTheme.typography.titleSmall)
+                                        Text("Flood: ${prop.femaFloodZone} · Fire: ${prop.fireHazardZone}", style = MaterialTheme.typography.labelSmall)
+                                    }
+                                    Switch(
+                                        checked = prop.notifyPriorityAlerts,
+                                        onCheckedChange = { viewModel.toggleSavedPropertyAlert(prop.id, it) }
+                                    )
+                                    IconButton(onClick = { viewModel.deleteSavedProperty(prop.id) }) {
+                                        Icon(Icons.Filled.Delete, contentDescription = "Delete monitored property", tint = FloodCrimson)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -390,12 +761,19 @@ fun AtlasMapScreen(
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            text = reportsUi.message,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(14.dp)
-                        )
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = "Database Sync Notice: ${reportsUi.message}",
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "If this shows PERMISSION_DENIED, ensure you are signed in with Google and Firestore rules are deployed.",
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
                     }
                 }
             }

@@ -63,6 +63,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.data.model.FloodRiskLevel
 import com.example.data.model.HourlyRainPoint
+import com.example.data.model.LiveDisasterEvent
+import com.example.data.model.SavedMonitoredProperty
 import com.example.data.model.WaterReport
 import com.example.ui.theme.AquiferTeal
 import com.example.ui.theme.FloodAmber
@@ -330,7 +332,9 @@ fun InteractiveLeafletHydroMap(
     selectedReportId: String?,
     riskLevel: FloodRiskLevel,
     onSelectReport: (WaterReport) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    liveDisasters: List<LiveDisasterEvent> = emptyList(),
+    savedProperties: List<SavedMonitoredProperty> = emptyList()
 ) {
     var useLeafletWebMap by remember { mutableStateOf(true) }
     var tileStyle by remember { mutableStateOf("streets") } // "streets" | "topo" | "satellite"
@@ -404,6 +408,36 @@ fun InteractiveLeafletHydroMap(
                 }
                 arr.toString()
             }
+            val disastersJson = remember(liveDisasters) {
+                val arr = JSONArray()
+                liveDisasters.forEach { d ->
+                    arr.put(
+                        JSONObject().apply {
+                            put("lat", d.latitude)
+                            put("lon", d.longitude)
+                            put("type", d.type)
+                            put("title", d.title)
+                            put("ratio", d.distanceRatioLabel)
+                            put("src", d.source)
+                        }
+                    )
+                }
+                arr.toString()
+            }
+            val propsJson = remember(savedProperties) {
+                val arr = JSONArray()
+                savedProperties.forEach { p ->
+                    arr.put(
+                        JSONObject().apply {
+                            put("lat", p.latitude)
+                            put("lon", p.longitude)
+                            put("label", p.label)
+                            put("fema", p.femaFloodZone)
+                        }
+                    )
+                }
+                arr.toString()
+            }
 
             var webViewRef by remember { mutableStateOf<WebView?>(null) }
             var mapLoaded by remember { mutableStateOf(false) }
@@ -437,7 +471,7 @@ fun InteractiveLeafletHydroMap(
                                 override fun onPageFinished(view: WebView?, url: String?) {
                                     mapLoaded = true
                                     view?.evaluateJavascript(
-                                        "window.updateHydroMap($centerLat, $centerLon, $reportsJson, ${JSONObject.quote(selectedReportId ?: "")}, ${JSONObject.quote(tileStyle)});",
+                                        "window.updateHydroMap($centerLat, $centerLon, $reportsJson, ${JSONObject.quote(selectedReportId ?: "")}, ${JSONObject.quote(tileStyle)}, $disastersJson, $propsJson);",
                                         null
                                     )
                                 }
@@ -455,14 +489,14 @@ fun InteractiveLeafletHydroMap(
                     update = { view ->
                         if (mapLoaded) {
                             view.evaluateJavascript(
-                                "window.updateHydroMap($centerLat, $centerLon, $reportsJson, ${JSONObject.quote(selectedReportId ?: "")}, ${JSONObject.quote(tileStyle)});",
+                                "window.updateHydroMap($centerLat, $centerLon, $reportsJson, ${JSONObject.quote(selectedReportId ?: "")}, ${JSONObject.quote(tileStyle)}, $disastersJson, $propsJson);",
                                 null
                             )
                         }
                     }
                 )
 
-                // Depth Legend Overlay
+                // Depth + Disaster Legend Overlay
                 Surface(
                     color = Color(0xCC06253A),
                     shape = RoundedCornerShape(50),
@@ -475,9 +509,15 @@ fun InteractiveLeafletHydroMap(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        LegendDot(color = FloodCrimson, label = "Shallow ≤5ft")
+                        LegendDot(color = FloodCrimson, label = "≤5ft")
                         LegendDot(color = FloodAmber, label = "5–12ft")
                         LegendDot(color = AquiferTeal, label = ">12ft")
+                        if (liveDisasters.isNotEmpty()) {
+                            LegendDot(color = Color(0xFFF97316), label = "Fire/Flood")
+                        }
+                        if (savedProperties.isNotEmpty()) {
+                            LegendDot(color = SafeEmerald, label = "My Property")
+                        }
                     }
                 }
             }
@@ -755,7 +795,7 @@ private const val LEAFLET_HTML = """
       markerLayer = L.layerGroup().addTo(map);
     }
 
-    window.updateHydroMap = function(lat, lon, reports, selectedId, tileStyle) {
+    window.updateHydroMap = function(lat, lon, reports, selectedId, tileStyle, disasters, properties) {
       if (typeof L === 'undefined') return;
       ensureMap(lat, lon);
       var nextCenter = lat.toFixed(3) + ',' + lon.toFixed(3);
@@ -779,6 +819,21 @@ private const val LEAFLET_HTML = """
       L.circleMarker([lat, lon], {
         radius: 6, color: '#ffffff', fillColor: '#0284c7', fillOpacity: 0.9, weight: 2
       }).addTo(markerLayer);
+
+      // Saved user houses / businesses
+      (properties || []).forEach(function(p) {
+        L.circleMarker([p.lat, p.lon], {
+          radius: 9, color: '#ffffff', weight: 2.5, fillColor: '#10b981', fillOpacity: 0.95
+        }).addTo(markerLayer).bindPopup('<div class="wt-popup"><b>My Property: ' + p.label + '</b><br/>' + p.fema + '</div>');
+      });
+
+      // Live Wildfires & Flood Disasters
+      (disasters || []).forEach(function(d) {
+        var dColor = d.type === 'wildfire' ? '#f97316' : '#2563eb';
+        L.circleMarker([d.lat, d.lon], {
+          radius: 10, color: '#ffffff', weight: 2, fillColor: dColor, fillOpacity: 0.92
+        }).addTo(markerLayer).bindPopup('<div class="wt-popup"><b>' + d.title + '</b><br/>' + d.src + '<br/>' + d.ratio + '</div>');
+      });
 
       reports.forEach(function(r) {
         var isShallow = r.depth > 0 && r.depth <= 5.0;

@@ -2,17 +2,24 @@ package com.example.data.repository
 
 import android.graphics.Bitmap
 import android.util.Log
+import com.example.data.catalog.WaterTableCatalogs
 import com.example.data.model.AdaptiveSolutionStat
 import com.example.data.model.AiMatchConciergeVerdict
+import com.example.data.model.BuildingPhotoAiAnalysis
+import com.example.data.model.BuildingProblemCategoryAssessment
 import com.example.data.model.ConsultationRequest
 import com.example.data.model.ContractorCopilotAdvice
 import com.example.data.model.ContractorMatchResult
+import com.example.data.model.DiyPestSupplyItem
 import com.example.data.model.GroundedCreditLink
 import com.example.data.model.GroundwaterAiDiagnosis
+import com.example.data.model.HomeAzAiInspection
 import com.example.data.model.IicrcAuditRecord
 import com.example.data.validation.AiModerationVerdict
 import com.example.data.model.JobKitRecommendation
 import com.example.data.model.LiveDisasterEvent
+import com.example.data.model.OnlineVerifiedContractorLead
+import com.example.data.model.PestControlAiAnalysis
 import com.example.data.model.PropertyHazardHistory
 import com.example.data.model.WaterReport
 import com.example.data.model.WholesaleProduct
@@ -152,6 +159,182 @@ class AiGroundwaterRepository {
             generationConfig = generationConfig {
                 responseMimeType = "application/json"
                 responseSchema = matchConciergeSchema
+            }
+        )
+    }
+
+    private val homeAzSchema = Schema.obj(
+        properties = mapOf(
+            "calmingReassurance" to Schema.string(description = "Warm, calming, anxiety-reducing 2-3 sentence opening reassuring the homeowner this problem has clear, fixable steps and explaining why not to panic"),
+            "detectedIssueTitle" to Schema.string(description = "Clear plain-English title of the detected A-Z house problem"),
+            "severityLabel" to Schema.enumeration(
+                values = listOf("Low", "Moderate", "Urgent"),
+                description = "Realistic urgency level"
+            ),
+            "recommendedTrade" to Schema.string(description = "Best A-Z licensed contractor trade label"),
+            "recommendedSpecialtyKey" to Schema.enumeration(
+                values = listOf(
+                    "soil_engineer", "structural_engineer", "general_engineer", "industrial_hygienist",
+                    "landscaper", "drainage_contractor", "leak_specialist", "water_mitigation",
+                    "mold_remediation", "smoke_fire_restoration", "full_service_restoration",
+                    "iicrc_inspector", "plumber", "roofer", "foundation_specialist",
+                    "electrician", "hvac", "general_contractor"
+                ),
+                description = "Exact specialty key to route the homeowner to"
+            ),
+            "scopeOfWork" to Schema.string(description = "Step-by-step Scope of Work contractors will perform so homeowner knows every step and isn't overcharged"),
+            "estimatedPriceLowUsd" to Schema.integer(description = "Realistic fair low-end market repair cost in USD"),
+            "estimatedPriceHighUsd" to Schema.integer(description = "Realistic fair high-end market repair cost in USD"),
+            "geologicalAndElevationNotes" to Schema.string(description = "Geological, lot grading, elevation, or slab water-table notes observed"),
+            "lifeExpectancyForecast" to Schema.string(description = "AI remaining useful life expectancy estimate for the inspected roof, pipes, copper lines, slab, or exterior"),
+            "plumbingAndPipeCorrosionFindings" to Schema.string(description = "Specific check for under-sink drain leaks, supply valves, or exterior copper pipe green/blue patina & pinhole corrosion risk"),
+            "drainageAndErosionFindings" to Schema.string(description = "Exterior lot slope, soil erosion, weep screed height, and downspout runoff findings"),
+            "needsHygienistAirOrTapeTest" to Schema.boolean(description = "True if mold/air spore traps or tape lift sampling by an Industrial Hygienist is advised"),
+            "needsEquipmentRental" to Schema.boolean(description = "True if homeowner or restoration crew can speed drying with dehumidifier/HEPA air scrubber rental"),
+            "diyImmediateSteps" to Schema.array(
+                items = Schema.string(),
+                description = "3 calm, safe steps the homeowner can take today"
+            ),
+            "relatedVideoCategory" to Schema.enumeration(
+                values = listOf("soil_water", "mold", "shutoff", "plumbing_roof", "drainage"),
+                description = "Closest how-to video category"
+            )
+        )
+    )
+
+    private val homeAzModel by lazy {
+        Firebase.ai.generativeModel(
+            modelName = "gemini-3.8-flash",
+            generationConfig = generationConfig {
+                responseMimeType = "application/json"
+                responseSchema = homeAzSchema
+            }
+        )
+    }
+
+    private fun categoryAssessmentSchema(categoryDescription: String): Schema = Schema.obj(
+        properties = mapOf(
+            "riskLevel" to Schema.enumeration(
+                values = listOf("None Observed", "Low", "Moderate", "Elevated", "Urgent"),
+                description = "Observed visual risk severity for $categoryDescription"
+            ),
+            "visualIndicatorsFound" to Schema.array(
+                items = Schema.string(),
+                description = "Concrete visual indicators observed in the uploaded photo(s), or clearly state if angle did not show this area"
+            ),
+            "detailedAnalysis" to Schema.string(
+                description = "Plain-English engineering/contractor explanation of what is visible for $categoryDescription"
+            ),
+            "realLifeProblemsThatCanOccur" to Schema.array(
+                items = Schema.string(),
+                description = "Real-life structural, water, mold, safety, or financial damage that can occur if these indicators progress"
+            ),
+            "recommendedActions" to Schema.array(
+                items = Schema.string(),
+                description = "Prioritized practical repair, inspection, or preventive suggestions"
+            ),
+            "recommendedTradeKey" to Schema.enumeration(
+                values = listOf(
+                    "soil_engineer", "structural_engineer", "general_engineer", "industrial_hygienist",
+                    "landscaper", "drainage_contractor", "leak_specialist", "water_mitigation",
+                    "mold_remediation", "smoke_fire_restoration", "full_service_restoration",
+                    "iicrc_inspector", "plumber", "roofer", "foundation_specialist",
+                    "electrician", "hvac", "general_contractor"
+                ),
+                description = "Best contractor trade key for this category"
+            )
+        )
+    )
+
+    private val buildingPhotoAnalysisSchema = Schema.obj(
+        properties = mapOf(
+            "overallCondition" to Schema.string(description = "Concise 1-line summary of the visible condition of the photographed portion/building"),
+            "overallRiskBadge" to Schema.enumeration(
+                values = listOf("Low", "Moderate", "Elevated", "Urgent"),
+                description = "Overall inspection priority badge"
+            ),
+            "summary" to Schema.string(description = "2-3 sentence clear assessment of the photographed portion of the house or building"),
+            "visualHighlightsSummary" to Schema.string(description = "Key visual cues spotted directly in the uploaded image(s)"),
+            "drainage" to categoryAssessmentSchema("Lot grading, surface runoff, downspouts, efflorescence, erosion, and moisture drainage"),
+            "roofing" to categoryAssessmentSchema("Shingles/tiles, flashing, valleys, fascia, gutters, vents, and roof moisture staining"),
+            "foundation" to categoryAssessmentSchema("Slab cracks, stair-step cracks, spalling, settlement gaps, damp base bands, and footing integrity"),
+            "additionalPortionFindings" to categoryAssessmentSchema("Portion-specific findings (interior framing, plumbing, copper pipes, HVAC, electrical, stucco/siding, balcony, basement, or commercial envelope)"),
+            "realLifeRisksIfIgnored" to Schema.array(
+                items = Schema.string(),
+                description = "3-5 concrete real-life problems that can occur over time if the observed issues or vulnerabilities go unaddressed"
+            ),
+            "actionableSuggestions" to Schema.array(
+                items = Schema.string(),
+                description = "4-6 practical AI suggestions covering DIY maintenance, professional verification, and preventative steps"
+            ),
+            "estimatedRepairRangeUsd" to Schema.string(description = "Realistic market USD cost range e.g. '\$350 – \$1,800' or '\$0 – \$250 DIY'"),
+            "topRecommendedSpecialtyKey" to Schema.enumeration(
+                values = listOf(
+                    "soil_engineer", "structural_engineer", "general_engineer", "industrial_hygienist",
+                    "landscaper", "drainage_contractor", "leak_specialist", "water_mitigation",
+                    "mold_remediation", "smoke_fire_restoration", "full_service_restoration",
+                    "iicrc_inspector", "plumber", "roofer", "foundation_specialist",
+                    "electrician", "hvac", "general_contractor"
+                ),
+                description = "Single highest-priority licensed trade key"
+            )
+        )
+    )
+
+    private val buildingPhotoModel by lazy {
+        Firebase.ai.generativeModel(
+            modelName = "gemini-3.8-flash",
+            generationConfig = generationConfig {
+                responseMimeType = "application/json"
+                responseSchema = buildingPhotoAnalysisSchema
+            }
+        )
+    }
+
+    private val pestControlSchema = Schema.obj(
+        properties = mapOf(
+            "suspectedCurrentProblem" to Schema.string(description = "Clear diagnosis of the current pest, rodent entry, or termite problem at the property"),
+            "pestCategory" to Schema.enumeration(
+                values = listOf("rodent_entry", "termite", "insect_crawling", "moisture_pest", "wildlife_burrow", "general_pest"),
+                description = "Primary pest category"
+            ),
+            "urgencyLevel" to Schema.enumeration(
+                values = listOf("Low", "Moderate", "Elevated", "Urgent"),
+                description = "Infestation or structural risk urgency"
+            ),
+            "confidenceSummary" to Schema.string(description = "1-2 sentence summary explaining why the uploaded photos and/or described signs indicate this problem"),
+            "obviousSignsDetected" to Schema.array(
+                items = Schema.string(),
+                description = "Specific visual entry signs (chew marks, sebum rub marks, gaps >= 1/4 inch, torn vent screens, droppings, mud tubes, frass pellets, wings) or key symptom matches"
+            ),
+            "howToSealAndExcludeSteps" to Schema.array(
+                items = Schema.string(),
+                description = "Actionable step-by-step instructions to physically seal entry points or exclude pests (use copper/stainless mesh, hardware cloth, metal flashing, polyurethane sealant — warn against plain expanding foam)"
+            ),
+            "treatmentAndResidualInsight" to Schema.string(description = "Practical explanation of treatment options, emphasizing non-residual knockdowns vs long-lasting residual pesticides & baiting strategies"),
+            "termiteStrategyNote" to Schema.string(description = "Termite-specific insight when termites are mentioned or suspected: fumigation/tenting has ZERO residual allowing immediate re-entry unless paired with interior Hot Spot residual pesticides + exterior ground bait stations; otherwise note how moisture/wood access affects pests"),
+            "diySuppliesNeeded" to Schema.array(
+                items = Schema.obj(
+                    properties = mapOf(
+                        "name" to Schema.string(description = "Specific DIY pest control product type needed (e.g. Copper Exclusion Mesh, 1/4 inch Hardware Cloth, Fipronil Residual Concentrate, In-Ground Termite Bait Stations)"),
+                        "purpose" to Schema.string(description = "Why and how the homeowner uses this item"),
+                        "searchKeyword" to Schema.string(description = "Short search query for DoMyOwn.com DIY pest control supply store"),
+                        "category" to Schema.string(description = "Short category label e.g. Exclusion Seal-Up, Traps, Residual Barrier, Termite Bait")
+                    )
+                ),
+                description = "3 to 5 specific DIY items needed so the homeowner can buy supplies and do the work themselves"
+            ),
+            "shouldCallLicensedPro" to Schema.boolean(description = "True if heavy structural damage, attic remediation, widespread drywood termites, or electrical chewing hazards warrant a licensed pest pro"),
+            "recommendedProReason" to Schema.string(description = "When to escalate vs handle DIY safely")
+        )
+    )
+
+    private val pestControlModel by lazy {
+        Firebase.ai.generativeModel(
+            modelName = "gemini-3.8-flash",
+            generationConfig = generationConfig {
+                responseMimeType = "application/json"
+                responseSchema = pestControlSchema
             }
         )
     }
@@ -702,7 +885,9 @@ class AiGroundwaterRepository {
         femaFloodZone: String,
         floodRiskDesc: String,
         nearbyReports: List<WaterReport>,
-        liveDisasters: List<LiveDisasterEvent>
+        liveDisasters: List<LiveDisasterEvent>,
+        elevationFeet: Int = 0,
+        historicalStormDays: Int = 0
     ): Result<PropertyHazardHistory> {
         val shallowReports = nearbyReports.filter { it.depthFeet in 0.1..6.5 }
         val nearestDepth = nearbyReports.minByOrNull { it.depthFeet }?.depthFeet
@@ -720,21 +905,38 @@ class AiGroundwaterRepository {
                 A homebuyer or property owner is evaluating this ${if (propertyType == "business") "commercial property" else "house"}:
                 - Address / Label: $address ($label)
                 - City/State: $city, $state (GPS $latitude, $longitude)
+                - Measured Terrain Elevation: $elevationFeet ft above sea level
+                - Past 5-Year Heavy Storm/Wind Events (Open-Meteo Archive): $historicalStormDays severe days
                 - Mapped FEMA Flood Zone: $femaFloodZone ($floodRiskDesc)
                 - WaterTable Community Shallow Depth Logs: $gwSummary
                 - Nearest Active Wildfire Distance: ${nearestFire?.let { "$it miles" } ?: "None within 50 miles"}
                 - Nearest Active Flood Alert/Gauge: ${nearestFlood?.let { "$it miles" } ?: "None active right now"}
 
-                Use Google Search to check historical flood risk, wildfire hazard severity zones (WUI/CAL FIRE/FEMA), and regional groundwater/soil drainage history in $city, $state.
+                Use Google Search to research public records and history of $city, $state (near $address):
+                1) What was that land used for BEFORE neighborhoods/houses were built there (wetland, citrus grove, orchard, floodplain, oil field, wash, ranchland, marsh, creek bed,chaparral hillside)?
+                2) Neighborhood development era & soil/erosion comparison notes.
+                3) Past Mother Nature experiences in this neighborhood (major floods, debris flows, wildfires, earthquakes, atmospheric rivers).
                 Provide:
                 [FIRE_HAZARD_ZONE]
                 Short label (e.g., High WUI / Moderate Fire Zone / Low Urban Fire Zone)
                 [/FIRE_HAZARD_ZONE]
+                [LAND_BEFORE_HOUSE]
+                2-3 sentences explaining what this exact land/watershed was before houses were built here (orchards, seasonal creek wash, marsh/peat, grazing ranch, hillside chaparral) and how that impacts slab/drainage today.
+                [/LAND_BEFORE_HOUSE]
+                [NEIGHBORHOOD_ERA]
+                Short development era & construction note (e.g., 1960s-1970s tract homes on expansive alluvial clay or post-2000 master-planned slab).
+                [/NEIGHBORHOOD_ERA]
+                [MOTHER_NATURE_HISTORY]
+                Public-data summary of notable Mother Nature events in $city / surrounding watershed (major flood years, fires, windstorms, atmospheric rivers).
+                [/MOTHER_NATURE_HISTORY]
+                [EROSION_NOTES]
+                Practical satellite/elevation comparison note for comparing older vs newer aerial drainage swales, hillside creep, and insurance underwriting.
+                [/EROSION_NOTES]
                 [HISTORICAL_DOSSIER]
                 Concise pre-purchase / owner historical risk brief covering flood history, fire history, groundwater seepage risk, insurance considerations, and what cleanses/mitigations contractors advise BEFORE closing or remodeling.
                 [/HISTORICAL_DOSSIER]
                 [CHECKLIST]
-                4 short pipe-separated pre-buy or cleanse action items (e.g., Request CLUE report|Camera sewer & French drain scope|Moisture meter slab check|HEPA/vent brush clearance)
+                4 short pipe-separated pre-buy or cleanse action items (e.g., Request CLUE report|Camera sewer & French drain scope|Moisture meter slab check|Compare Google Earth historic aerial erosion)
                 [/CHECKLIST]
             """.trimIndent()
 
@@ -755,11 +957,15 @@ class AiGroundwaterRepository {
                     } else null
                 }
                 ?.distinctBy { it.url }
-                ?.take(5)
+                ?.take(6)
                 .orEmpty()
 
             val fireZone = extractTaggedBlock(raw, "FIRE_HAZARD_ZONE").trim()
                 .ifBlank { if ((nearestFire ?: 999.0) <= 25.0) "Elevated Wildfire Proximity" else "Standard Fire Hazard Zone" }
+            val landBefore = extractTaggedBlock(raw, "LAND_BEFORE_HOUSE").trim()
+            val era = extractTaggedBlock(raw, "NEIGHBORHOOD_ERA").trim()
+            val motherNature = extractTaggedBlock(raw, "MOTHER_NATURE_HISTORY").trim()
+            val erosionNotes = extractTaggedBlock(raw, "EROSION_NOTES").trim()
             val dossier = extractTaggedBlock(raw, "HISTORICAL_DOSSIER").trim().ifBlank { raw.take(1400) }
             val checklistRaw = extractTaggedBlock(raw, "CHECKLIST").trim()
             val checklist = checklistRaw.split("|", "\n")
@@ -769,8 +975,8 @@ class AiGroundwaterRepository {
                 .ifEmpty {
                     listOf(
                         "Check CLUE insurance loss history & seller disclosures",
-                        "Inspect sub-slab / crawlspace moisture & groundwater depth logs",
-                        "Confirm FEMA flood zone & drainage slope away from foundation",
+                        "Compare Google Maps aerials over years for yard/hillside erosion",
+                        "Inspect sub-slab / crawlspace moisture & exterior copper lines",
                         "Verify defensible space & HVAC/attic smoke filter readiness"
                     )
                 }
@@ -794,7 +1000,13 @@ class AiGroundwaterRepository {
                     nearestActiveFloodMiles = nearestFlood,
                     aiHistoricalDossier = dossier,
                     preBuyOrCleanseChecklist = checklist,
-                    creditLinks = links
+                    creditLinks = links,
+                    elevationFeet = elevationFeet,
+                    landBeforeHouseBuilt = landBefore,
+                    neighborhoodEra = era,
+                    motherNatureHistory = motherNature,
+                    erosionComparisonNotes = erosionNotes,
+                    historicalStormCount = historicalStormDays
                 )
             )
         } catch (e: TimeoutCancellationException) {
@@ -803,6 +1015,297 @@ class AiGroundwaterRepository {
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "Property hazard dossier failed", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Calming multimodal AI house inspector covering:
+     * 1) "az_photo": Roof leaks to slab cracks, under-sink drains, exterior copper corrosion, price check, scope of work.
+     * 2) "exterior_video": Multi-frame exterior walkaround spotting negative grading & foundation water runoff risks.
+     * 3) "future_home": Pre-buy geological/elevation assessment, erosion comparison cues, & component life expectancy.
+     */
+    suspend fun analyzeAzHouseOrExteriorVideoProblem(
+        mode: String,
+        city: String,
+        state: String,
+        elevationFeet: Int,
+        problemArea: String,
+        userDescription: String,
+        bitmaps: List<Bitmap>
+    ): Result<HomeAzAiInspection> {
+        return try {
+            val modePrompt = when (mode) {
+                "exterior_video" -> "Inspect these sequential exterior video walkaround frames carefully for negative soil grading sloping toward the foundation, buried weep screed, ponding runoff, gutter downspouts dumping at the slab, hillside erosion, and exterior copper pipe/hose-bib corrosion."
+                "future_home" -> "Perform a pre-purchase / future-home interior & exterior inspection: evaluate geological & elevation drainage risks ($elevationFeet ft elevation in $city, $state), signs of past flooding or foundation settlement, under-sink drain leaks, exterior copper pipe green/blue corrosion, roof wear, and estimate remaining useful life expectancy."
+                else -> "Inspect this homeowner's house issue photo(s) from roof leaks to slab cracks, under-sink plumbing drains, exterior copper corrosion, mold spots, or moisture staining. Be reassuring, give a transparent fair Scope of Work, and provide realistic market Price Check USD estimates."
+            }
+
+            val input = content {
+                bitmaps.take(5).forEach { bmp -> image(bmp) }
+                text(
+                    """
+                    You are a calm, empathetic, deeply knowledgeable Master Building Inspector & Restoration Advisor in $city, $state.
+                    The homeowner may be stressed or worried about their house. Start with warm reassurance that home issues are fixable and step-by-step scope protects them from overpaying.
+
+                    Mode: $mode ($modePrompt)
+                    Property City/State: $city, $state (Elevation: $elevationFeet ft)
+                    Focus Area Selected: $problemArea
+                    Homeowner Notes / Questions: ${userDescription.ifBlank { "Please inspect attached photo/video frames and advise calm next steps, fair price check, and scope of work." }}
+                    """.trimIndent()
+                )
+            }
+
+            val response = withTimeout(60_000L) {
+                homeAzModel.generateContent(input)
+            }
+            val raw = response.text ?: throw IllegalStateException("Empty AI home inspection response.")
+            val json = JSONObject(raw)
+            val stepsArr = json.optJSONArray("diyImmediateSteps")
+            val steps = buildList {
+                if (stepsArr != null) {
+                    for (i in 0 until stepsArr.length()) {
+                        stepsArr.optString(i).takeIf { it.isNotBlank() }?.let { add(it) }
+                    }
+                }
+            }.ifEmpty {
+                listOf("Take a deep breath and document date-stamped photos.", "Check shutoff valves if active water is dripping.", "Request 2 licensed quotes with the Scope of Work below.")
+            }
+
+            Result.success(
+                HomeAzAiInspection(
+                    mode = mode,
+                    calmingReassurance = json.optString("calmingReassurance", "Take a deep breath — almost every home leak or moisture issue has a clear, manageable fix once diagnosed step by step."),
+                    detectedIssueTitle = json.optString("detectedIssueTitle", problemArea.ifBlank { "Home Inspection Findings" }),
+                    severityLabel = json.optString("severityLabel", "Moderate"),
+                    recommendedTrade = json.optString("recommendedTrade", "General Contractor (B)"),
+                    recommendedSpecialtyKey = json.optString("recommendedSpecialtyKey", "general_contractor"),
+                    scopeOfWork = json.optString("scopeOfWork", "On-site moisture/visual confirmation followed by targeted component repair."),
+                    estimatedPriceLowUsd = json.optInt("estimatedPriceLowUsd", 250),
+                    estimatedPriceHighUsd = json.optInt("estimatedPriceHighUsd", 1200),
+                    geologicalAndElevationNotes = json.optString("geologicalAndElevationNotes", "Site at $elevationFeet ft elevation; keep positive drainage 6 inches away over first 10 ft."),
+                    lifeExpectancyForecast = json.optString("lifeExpectancyForecast", "Confirm age of roof flashing, under-sink supply lines, and copper piping on site."),
+                    plumbingAndPipeCorrosionFindings = json.optString("plumbingAndPipeCorrosionFindings", "Inspect under-sink P-traps and exterior copper risers for green patina/verdigris."),
+                    drainageAndErosionFindings = json.optString("drainageAndErosionFindings", "Verify soil slopes away from slab and downspouts extend 8-10 ft clear."),
+                    needsHygienistAirOrTapeTest = json.optBoolean("needsHygienistAirOrTapeTest", false),
+                    needsEquipmentRental = json.optBoolean("needsEquipmentRental", false),
+                    diyImmediateSteps = steps,
+                    relatedVideoCategory = json.optString("relatedVideoCategory", "plumbing_roof")
+                )
+            )
+        } catch (e: TimeoutCancellationException) {
+            Result.failure(IllegalStateException("A-Z Home AI inspector timed out after 60s."))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "A-Z Home AI inspection failed", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Uses Gemini 3.8 Flash + Google Search Grounding to locate reputable licensed A-Z contractors online
+     * near the user's city with verification links (CSLB, official contractor websites, Better Business / Yelp).
+     */
+    suspend fun findOnlineReputableContractors(
+        tradeLabel: String,
+        city: String,
+        state: String,
+        issueDescription: String
+    ): Result<List<OnlineVerifiedContractorLead>> {
+        return try {
+            val prompt = """
+                Search online for reputable, well-reviewed, licensed contractors near $city, $state for:
+                Trade Needed: $tradeLabel
+                Homeowner Issue: ${issueDescription.ifBlank { "$tradeLabel repair & inspection" }}
+
+                Return 3 to 5 specific real local contractor businesses or official licensing directories found via Google Search.
+                Output each lead cleanly inside repeating blocks like:
+                [LEAD]
+                COMPANY: Company Name
+                TRADE: Specific Trade / Services
+                LICENSE_OR_RATING: CSLB license info or public rating summary found
+                URL: Exact https:// URL from search
+                REASON: Why reputable & strong match for this issue
+                [/LEAD]
+            """.trimIndent()
+
+            val response = withTimeout(60_000L) {
+                webGroundedCopilotModel.generateContent(prompt)
+            }
+            val raw = response.text ?: throw IllegalStateException("Empty contractor search response.")
+            val groundingWeb = response.candidates.firstOrNull()?.groundingMetadata?.groundingChunks
+                ?.mapNotNull { it.web }
+                .orEmpty()
+
+            val parsedLeads = mutableListOf<OnlineVerifiedContractorLead>()
+            val blocks = raw.split("[LEAD]")
+            for (blk in blocks.drop(1)) {
+                val inner = blk.substringBefore("[/LEAD]").trim()
+                fun field(name: String): String =
+                    inner.lines().firstOrNull { it.trim().startsWith("$name:", ignoreCase = true) }
+                        ?.substringAfter(":")?.trim().orEmpty()
+
+                val name = field("COMPANY")
+                if (name.isNotBlank()) {
+                    val urlRaw = field("URL").takeIf { it.startsWith("http") }
+                        ?: groundingWeb.firstOrNull { it.title?.contains(name.take(8), ignoreCase = true) == true }?.uri
+                        ?: "https://www.cslb.ca.gov/OnlineServices/CheckLicenseII/CheckLicense.aspx"
+                    val domain = runCatching { java.net.URI(urlRaw).host?.removePrefix("www.").orEmpty() }.getOrDefault("")
+                    parsedLeads.add(
+                        OnlineVerifiedContractorLead(
+                            companyName = name,
+                            tradeSummary = field("TRADE").ifBlank { tradeLabel },
+                            licenseOrRatingHint = field("LICENSE_OR_RATING").ifBlank { "Verify active license on state board" },
+                            verificationUrl = urlRaw,
+                            domain = domain,
+                            reasonMatched = field("REASON").ifBlank { "Matched online for $tradeLabel near $city" }
+                        )
+                    )
+                }
+            }
+
+            if (parsedLeads.isEmpty()) {
+                groundingWeb.filter { !it.uri.isNullOrBlank() }.take(4).forEach { web ->
+                    parsedLeads.add(
+                        OnlineVerifiedContractorLead(
+                            companyName = web.title?.take(60) ?: (web.domain ?: "$tradeLabel Directory"),
+                            tradeSummary = tradeLabel,
+                            licenseOrRatingHint = "Verified Search Result · Confirm CSLB Active Status",
+                            verificationUrl = web.uri!!,
+                            domain = web.domain.orEmpty(),
+                            reasonMatched = "Grounded web match near $city, $state"
+                        )
+                    )
+                }
+            }
+
+            Result.success(parsedLeads.take(5))
+        } catch (e: TimeoutCancellationException) {
+            Result.failure(IllegalStateException("Online contractor search timed out after 60s."))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "Online contractor search failed", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Multimodal Building & House Exterior Photo AI Inspector.
+     * Supports any photo(s) of any portion of a house or building (exterior walls, yard grading, roof,
+     * foundation, basement, crawlspace, plumbing, electrical, interior, or commercial building),
+     * highlighting visual indicators for Drainage, Roofing, Foundation, and portion-specific
+     * real-life problems that can occur.
+     */
+    suspend fun analyzeBuildingOrExteriorPhotos(
+        city: String,
+        state: String,
+        elevationFeet: Int,
+        buildingType: String,
+        buildingPortion: String,
+        notes: String,
+        bitmaps: List<Bitmap>
+    ): Result<BuildingPhotoAiAnalysis> {
+        if (bitmaps.isEmpty()) {
+            return Result.failure(IllegalArgumentException("Please take or upload at least one photo of the house or building first."))
+        }
+        return try {
+            val promptText = """
+                You are a senior Master Building Inspector, Structural Forensics Advisor, and Restoration Specialist evaluating photo(s) in $city, $state (terrain elevation ~$elevationFeet ft).
+                Building Type: $buildingType
+                User-Selected Building Portion / Area: $buildingPortion
+                User Notes: ${notes.ifBlank { "Analyze all visible conditions, subtle warning signs, and real-life problems that can occur." }}
+
+                Carefully inspect all ${bitmaps.take(4).size} attached photo(s):
+                1. Highlight concrete VISUAL INDICATORS actually visible in the image(s). Be truthful: if a specific system (e.g., roof surface or foundation base) is NOT visible in the provided camera angle, state "Not clearly visible in this camera angle" in visualIndicatorsFound and set its riskLevel to "None Observed", while still mentioning what to check from that angle.
+                2. Explicitly evaluate these core building vulnerability systems based on common visual indicators:
+                   - DRAINAGE: negative lot slope sloping toward slab/building, disconnected or short downspouts discharging next to foundation, efflorescence/white salt deposits, buried weep screed, soil erosion/gullies, standing puddles, splashback mud/staining on lower siding, clogged swales or area drains.
+                   - ROOFING: missing, curled, cracked, or granule-bare shingles/tiles; rusted, lifted, or missing step/valley flashing; cracked neoprene plumbing vent boots; sagging fascia/soffit boards; pulling or clogged gutters; moss, algae streaks, or roof-to-wall water staining; flat-roof blistering or ponding rings.
+                   - FOUNDATION: horizontal, diagonal, or stair-step mortar/concrete cracks; spalling or flaking concrete; exposed or corroded rebar; differential settlement gaps around windows/doors/garage; damp lower perimeter band or rising wicking moisture; footing undermining.
+                   - ADDITIONAL PORTION FINDINGS ($buildingPortion): Analyze the exact photographed building portion—such as interior walls/ceilings (water rings, blistering paint, bubbling drywall tape, hidden mold potential), plumbing/under-sink/copper pipes (green/blue verdigris corrosion, weeping compression valves, P-trap leaks), basement/crawlspace (joist staining, efflorescence, high-humidity condensation), stucco/siding/decks (hairline stucco cracks, failed caulking, ledger flashing gaps, wood rot), HVAC/electrical (rusted condensate pan, corroded breaker exterior, unsealed penetrations), or commercial envelope/parapet/parking slab.
+                3. Clearly list REAL-LIFE PROBLEMS THAT CAN OCCUR if these conditions continue (e.g., sub-slab hydrostatic heave, hidden wall-cavity mold colonization, roof deck rot & ceiling collapse, pinhole pipe bursts, termite attraction to damp wood, insurance non-renewal or costly claim denial).
+                4. Provide practical, prioritized AI SUGGESTIONS (immediate homeowner safety/maintenance checks, what to document, and which licensed specialty trade to consult).
+            """.trimIndent()
+
+            val response = withTimeout(60_000L) {
+                buildingPhotoModel.generateContent(
+                    content {
+                        bitmaps.take(4).forEach { bmp -> image(bmp) }
+                        text(promptText)
+                    }
+                )
+            }
+            val rawJson = response.text ?: throw IllegalStateException("Gemini AI returned an empty photo analysis.")
+            Result.success(
+                parseBuildingPhotoAnalysisJson(
+                    jsonText = rawJson,
+                    inspectedPortion = buildingPortion,
+                    buildingType = buildingType
+                )
+            )
+        } catch (e: TimeoutCancellationException) {
+            Log.e(TAG, "Building photo AI analysis timed out", e)
+            Result.failure(IllegalStateException("Photo AI inspection timed out after 60s. Please retry."))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "Building photo AI analysis failed", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Multimodal & Symptom-Driven Pest, Rodent Entry, and Termite AI Advisor.
+     * Detects rodent entry points & obvious entrance signs in photos, gives step-by-step exclusion/seal-up
+     * instructions, links DIY DoMyOwn.com items needed, and diagnoses any pest/termite concerns
+     * including Tenting (zero residual) vs Hot Spot Residual + Exterior Ground Bait Stations.
+     */
+    suspend fun analyzePestOrRodentEntryProblem(
+        city: String,
+        state: String,
+        focusType: String,
+        userConcern: String,
+        bitmaps: List<Bitmap>
+    ): Result<PestControlAiAnalysis> {
+        if (bitmaps.isEmpty() && userConcern.isBlank()) {
+            return Result.failure(
+                IllegalArgumentException("Please take/upload a photo of a possible entry point or describe your pest concern first.")
+            )
+        }
+        return try {
+            val promptText = """
+                You are a veteran Master Pest Control Inspector, Rodent Exclusion Specialist, and Structural Termite Strategist serving $city, $state.
+                User Selected Focus: $focusType
+                Homeowner Concerns & Symptoms: ${userConcern.ifBlank { "Analyze the attached photo(s) carefully for rodent entry points, structural gaps, pest evidence, and DIY fix steps." }}
+                Attached Photos: ${bitmaps.take(4).size}
+
+                Instructions:
+                1. Suggest the exact CURRENT PEST PROBLEM at the property based on the photos and/or described concerns (mice, roof/Norway rats, drywood termites, subterranean termites, ants, cockroaches, carpenter bees/ants, moisture pests, gophers/burrows, etc.).
+                2. If photos are provided, point out EVERY OBVIOUS SIGN OF ENTRANCE OR ACTIVITY visible (gaps >= 1/4" under siding/pipe chases/garage corners, chewed weatherstripping, dark greasy rub marks, chewed wood/foam, torn attic/crawlspace vent screens, droppings, mud tubes, frass pellets, wings, damp wood).
+                3. Provide exact STEP-BY-STEP HOW TO SEAL UP & EXCLUDE instructions (always pair copper/stainless steel exclusion wool like Xcluder/Stuf-Fit with polyurethane caulk or galvanized 1/4" hardware cloth + metal flashing; explicitly warn NEVER to use expanding spray foam alone because rodents chew right through plain foam).
+                4. Address RESIDUAL vs NON-RESIDUAL treatments truthfully:
+                   - For Termites: explain how Termite Testing / Tenting (sulfuryl fluoride fumigation) kills active termites inside the wood at that moment but leaves ZERO chemical residual—allowing new swarming termites back into the house almost immediately once the tent airs out. Compare pros/cons of Tenting vs Hot Spot Treatments (fipronil/borate residual pesticides that stay active for years and work better than testing/tenting alone for accessible colonies), and recommend the complete 3-part defense when tenting is needed: Tent + Interior Hot Spot Residual + Exterior Ground Bait Stations.
+                5. List 3-5 concrete DIY items needed for DoMyOwn.com so the homeowner can buy exact exclusion mesh, hardware cloth, traps, residual treatments, or exterior bait stations and do the work themselves.
+            """.trimIndent()
+
+            val response = withTimeout(60_000L) {
+                pestControlModel.generateContent(
+                    content {
+                        bitmaps.take(4).forEach { bmp -> image(bmp) }
+                        text(promptText)
+                    }
+                )
+            }
+            val rawJson = response.text ?: throw IllegalStateException("Gemini AI returned an empty pest analysis.")
+            Result.success(parsePestControlAnalysisJson(rawJson))
+        } catch (e: TimeoutCancellationException) {
+            Log.e(TAG, "Pest AI analysis timed out", e)
+            Result.failure(IllegalStateException("Pest AI analysis timed out after 60s. Please retry."))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "Pest AI analysis failed", e)
             Result.failure(e)
         }
     }
@@ -818,7 +1321,132 @@ class AiGroundwaterRepository {
         else source.substring(afterStart, end).trim()
     }
 
-    private companion object {
-        const val TAG = "AiGroundwaterRepo"
+    companion object {
+        private const val TAG = "AiGroundwaterRepo"
+
+        internal fun parseBuildingPhotoAnalysisJson(
+            jsonText: String,
+            inspectedPortion: String = "Exterior Overview",
+            buildingType: String = "Residential House"
+        ): BuildingPhotoAiAnalysis {
+            val cleaned = jsonText.trim()
+                .removePrefix("```json")
+                .removePrefix("```")
+                .removeSuffix("```")
+                .trim()
+            val root = JSONObject(cleaned)
+
+            fun JSONObject.stringList(key: String): List<String> {
+                val arr = optJSONArray(key) ?: return emptyList()
+                return buildList {
+                    for (i in 0 until arr.length()) {
+                        arr.optString(i).trim().takeIf { it.isNotBlank() }?.let { add(it) }
+                    }
+                }
+            }
+
+            fun parseCategory(
+                obj: JSONObject?,
+                title: String,
+                defaultTradeKey: String
+            ): BuildingProblemCategoryAssessment {
+                if (obj == null) {
+                    return BuildingProblemCategoryAssessment(
+                        category = title,
+                        riskLevel = "None Observed",
+                        visualIndicatorsFound = listOf("Not clearly visible in this camera angle."),
+                        detailedAnalysis = "Capture a dedicated angle of this area if you would like deeper AI visual verification.",
+                        realLifeProblemsThatCanOccur = emptyList(),
+                        recommendedActions = emptyList(),
+                        recommendedTradeKey = defaultTradeKey
+                    )
+                }
+                return BuildingProblemCategoryAssessment(
+                    category = title,
+                    riskLevel = obj.optString("riskLevel", "Low").ifBlank { "Low" },
+                    visualIndicatorsFound = obj.stringList("visualIndicatorsFound"),
+                    detailedAnalysis = obj.optString("detailedAnalysis", "").trim(),
+                    realLifeProblemsThatCanOccur = obj.stringList("realLifeProblemsThatCanOccur"),
+                    recommendedActions = obj.stringList("recommendedActions"),
+                    recommendedTradeKey = obj.optString("recommendedTradeKey", defaultTradeKey).ifBlank { defaultTradeKey }
+                )
+            }
+
+            return BuildingPhotoAiAnalysis(
+                inspectedPortion = inspectedPortion,
+                buildingType = buildingType,
+                overallCondition = root.optString("overallCondition", "Inspection Complete").ifBlank { "Inspection Complete" },
+                overallRiskBadge = root.optString("overallRiskBadge", "Moderate").ifBlank { "Moderate" },
+                summary = root.optString("summary", "").trim(),
+                visualHighlightsSummary = root.optString("visualHighlightsSummary", "").trim(),
+                drainage = parseCategory(root.optJSONObject("drainage"), "Drainage & Lot Runoff", "drainage_contractor"),
+                roofing = parseCategory(root.optJSONObject("roofing"), "Roofing & Flashing", "roofer"),
+                foundation = parseCategory(root.optJSONObject("foundation"), "Foundation & Slab", "foundation_specialist"),
+                additionalPortionFindings = parseCategory(
+                    root.optJSONObject("additionalPortionFindings"),
+                    "Portion-Specific: $inspectedPortion",
+                    "general_contractor"
+                ),
+                realLifeRisksIfIgnored = root.stringList("realLifeRisksIfIgnored"),
+                actionableSuggestions = root.stringList("actionableSuggestions"),
+                estimatedRepairRangeUsd = root.optString("estimatedRepairRangeUsd", "Verify with 2 licensed bids").ifBlank { "Verify with 2 licensed bids" },
+                topRecommendedSpecialtyKey = root.optString("topRecommendedSpecialtyKey", "general_contractor").ifBlank { "general_contractor" }
+            )
+        }
+
+        internal fun parsePestControlAnalysisJson(jsonText: String): PestControlAiAnalysis {
+            val cleaned = jsonText.trim()
+                .removePrefix("```json")
+                .removePrefix("```")
+                .removeSuffix("```")
+                .trim()
+            val root = JSONObject(cleaned)
+
+            fun JSONObject.stringList(key: String): List<String> {
+                val arr = optJSONArray(key) ?: return emptyList()
+                return buildList {
+                    for (i in 0 until arr.length()) {
+                        arr.optString(i).trim().takeIf { it.isNotBlank() }?.let { add(it) }
+                    }
+                }
+            }
+
+            val suppliesArr = root.optJSONArray("diySuppliesNeeded")
+            val supplies = buildList {
+                if (suppliesArr != null) {
+                    for (i in 0 until suppliesArr.length()) {
+                        val itemObj = suppliesArr.optJSONObject(i) ?: continue
+                        val name = itemObj.optString("name", "").trim()
+                        if (name.isNotBlank()) {
+                            val kw = itemObj.optString("searchKeyword", name).ifBlank { name }
+                            add(
+                                DiyPestSupplyItem(
+                                    name = name,
+                                    purpose = itemObj.optString("purpose", "DIY pest exclusion & treatment item").trim(),
+                                    websiteUrl = WaterTableCatalogs.buildDoMyOwnSearchUrl(kw),
+                                    category = itemObj.optString("category", "DIY Supply").ifBlank { "DIY Supply" }
+                                )
+                            )
+                        }
+                    }
+                }
+            }.ifEmpty {
+                WaterTableCatalogs.diyPestSupplyCatalog.take(3)
+            }
+
+            return PestControlAiAnalysis(
+                suspectedCurrentProblem = root.optString("suspectedCurrentProblem", "Pest Entry & Activity Assessment").ifBlank { "Pest Entry & Activity Assessment" },
+                pestCategory = root.optString("pestCategory", "general_pest").ifBlank { "general_pest" },
+                urgencyLevel = root.optString("urgencyLevel", "Moderate").ifBlank { "Moderate" },
+                confidenceSummary = root.optString("confidenceSummary", "").trim(),
+                obviousSignsDetected = root.stringList("obviousSignsDetected"),
+                howToSealAndExcludeSteps = root.stringList("howToSealAndExcludeSteps"),
+                treatmentAndResidualInsight = root.optString("treatmentAndResidualInsight", "").trim(),
+                termiteStrategyNote = root.optString("termiteStrategyNote", "").trim(),
+                diySuppliesNeeded = supplies,
+                shouldCallLicensedPro = root.optBoolean("shouldCallLicensedPro", false),
+                recommendedProReason = root.optString("recommendedProReason", "").trim()
+            )
+        }
     }
 }

@@ -362,3 +362,93 @@ data class ContractorProductReview(
     @ServerTimestamp val createdAt: Timestamp? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null
 )
+
+@IgnoreExtraProperties
+data class EquipmentRentalItem(
+    @DocumentId val id: String = "",
+    val ownerUserId: String = "",
+    val ownerName: String = "",
+    val ownerType: String = "restoration_company", // "restoration_company" | "resident"
+    val companyName: String = "",
+    val equipmentName: String = "",
+    val category: String = "Dehumidifier", // "Dehumidifier" | "Air Scrubber" | "Air Mover" | "Moisture Meter" | "Sump Pump" | "Thermal Camera"
+    val city: String = "",
+    val dailyRateUsd: Int = 45,
+    val depositUsd: Int = 100,
+    val specs: String = "",
+    val contactPhoneOrNote: String = "",
+    val isAvailable: Boolean = true,
+    @ServerTimestamp val createdAt: Timestamp? = null,
+    @ServerTimestamp val updatedAt: Timestamp? = null
+)
+
+@IgnoreExtraProperties
+data class AppRevisionSuggestion(
+    @DocumentId val id: String = "",
+    val userId: String = "",
+    val authorName: String = "",
+    val authorRole: String = "contractor", // "contractor" | "resident" | "insurer" | "iicrc_inspector"
+    val tradeOrSpecialty: String = "",
+    val title: String = "",
+    val category: String = "Workflow", // "Workflow" | "AI Diagnostics" | "Safety & Licensing" | "Insurance" | "Equipment & DIY"
+    val description: String = "",
+    val upvotesCount: Int = 0,
+    val status: String = "submitted", // "submitted" | "planned" | "shipped"
+    @ServerTimestamp val createdAt: Timestamp? = null,
+    @ServerTimestamp val updatedAt: Timestamp? = null
+)
+
+@IgnoreExtraProperties
+data class HygienistSampleRequest(
+    @DocumentId val id: String = "",
+    val clientUserId: String = "",
+    val clientName: String = "",
+    val hygienistUserId: String = "open_marketplace",
+    val hygienistName: String = "",
+    val city: String = "",
+    val propertyAddressHint: String = "",
+    val sampleTypes: List<String> = emptyList(), // e.g., ["Air Spore Trap", "Surface Tape Lift", "Lead/Asbestos Bulk"]
+    val reasonNotes: String = "",
+    val status: String = "requested", // "requested" | "accepted" | "sampled" | "lab_report_ready"
+    val quotedFeeUsd: Int = 0,
+    val labFindingsSummary: String = "",
+    @ServerTimestamp val createdAt: Timestamp? = null,
+    @ServerTimestamp val updatedAt: Timestamp? = null
+)
+
+@IgnoreExtraProperties
+data class InsurancePolicyOffer(
+    @DocumentId val id: String = "",
+    val insurerUserId: String = "",
+    val carrierName: String = "",
+    val clientUserId: String = "",
+    val clientName: String = "",
+    val propertyLabel: String = "",
+    val city: String = "",
+    val coverageType: String = "homeowners_ho3", // "homeowners_ho3" | "flood_nfip" | "wildfire_dic" | "landlord"
+    val coverageLimitUsd: Int = 350000,
+    val deductibleUsd: Int = 1000,
+    val baseMonthlyPremiumUsd: Int = 180,
+    val telemetryDiscountPercent: Int = 10,
+    val discountedMonthlyPremiumUsd: Int = 162,
+    val policyTermsSummary: String = "",
+    val status: String = "quoted", // "quoted" | "client_accepted" | "bound" | "declined"
+    @ServerTimestamp val createdAt: Timestamp? = null,
+    @ServerTimestamp val updatedAt: Timestamp? = null
+)
+
+@IgnoreExtraProperties
+data class FieldScoutApplication(
+    @DocumentId val id: String = "",
+    val userId: String = "",
+    val applicantName: String = "",
+    val city: String = "",
+    val scoutScore: Int = 0,
+    val verifiedReportsCount: Int = 0,
+    val availabilitySummary: String = "",
+    val coverageNotes: String = "",
+    val status: String = "applied", // "applied" | "active_paid_scout" | "paused"
+    @ServerTimestamp val createdAt: Timestamp? = null,
+    @ServerTimestamp val updatedAt: Timestamp? = null
+)
+

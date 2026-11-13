@@ -612,6 +612,63 @@ class LiveWeatherAndNewsRepository {
         )
     }
 
+    /**
+     * Fetches USGS/SRTM terrain elevation (feet) from Open-Elevation and 5-year historical
+     * extreme precipitation/wind storm event counts from Open-Meteo archive API.
+     */
+    suspend fun fetchElevationAndMotherNatureHistory(
+        latitude: Double,
+        longitude: Double
+    ): Pair<Int, Int> = withContext(Dispatchers.IO) {
+        var elevationFt = 0
+        var extremeStormDays = 0
+
+        runCatching {
+            val elevUrl = "https://api.open-elevation.com/api/v1/lookup?locations=${String.format(Locale.US, "%.5f", latitude)},${String.format(Locale.US, "%.5f", longitude)}"
+            val req = Request.Builder().url(elevUrl).header("User-Agent", "WaterTableApp/1.0").build()
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val json = JSONObject(resp.body?.string().orEmpty())
+                    val results = json.optJSONArray("results")
+                    if (results != null && results.length() > 0) {
+                        val meters = results.getJSONObject(0).optDouble("elevation", 0.0)
+                        elevationFt = (meters * 3.28084).toInt()
+                    }
+                }
+            }
+        }
+
+        runCatching {
+            val end = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(java.util.Date(System.currentTimeMillis() - 86_400_000L * 5))
+            val cal = java.util.Calendar.getInstance().apply { add(java.util.Calendar.YEAR, -5) }
+            val start = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(cal.time)
+            val archUrl = "https://archive-api.open-meteo.com/v1/archive" +
+                "?latitude=${String.format(Locale.US, "%.4f", latitude)}" +
+                "&longitude=${String.format(Locale.US, "%.4f", longitude)}" +
+                "&start_date=$start&end_date=$end" +
+                "&daily=precipitation_sum,wind_speed_10m_max&timezone=auto"
+            val req = Request.Builder().url(archUrl).header("User-Agent", "WaterTableApp/1.0").build()
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val daily = JSONObject(resp.body?.string().orEmpty()).optJSONObject("daily")
+                    val precip = daily?.optJSONArray("precipitation_sum")
+                    val wind = daily?.optJSONArray("wind_speed_10m_max")
+                    if (precip != null) {
+                        for (i in 0 until precip.length()) {
+                            val pMm = precip.optDouble(i, 0.0)
+                            val wKmH = wind?.optDouble(i, 0.0) ?: 0.0
+                            if (pMm >= 25.0 || wKmH >= 65.0) {
+                                extremeStormDays++
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        elevationFt to extremeStormDays
+    }
+
     fun haversineMiles(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
         val r = 3958.8
         val dLat = Math.toRadians(lat2 - lat1)

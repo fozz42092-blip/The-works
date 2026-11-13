@@ -278,7 +278,132 @@ data class PropertyHazardHistory(
     val nearestActiveFloodMiles: Double?,
     val aiHistoricalDossier: String,
     val preBuyOrCleanseChecklist: List<String> = emptyList(),
-    val creditLinks: List<GroundedCreditLink> = emptyList()
+    val creditLinks: List<GroundedCreditLink> = emptyList(),
+    val elevationFeet: Int = 0,
+    val landBeforeHouseBuilt: String = "",
+    val neighborhoodEra: String = "",
+    val motherNatureHistory: String = "",
+    val erosionComparisonNotes: String = "",
+    val historicalStormCount: Int = 0
+)
+
+data class SoilBottleResult(
+    val usdaTextureClass: String,
+    val drainageRating: String,
+    val mappedSoilTypeKey: String,
+    val clayPercent: Int,
+    val siltPercent: Int,
+    val sandPercent: Int,
+    val foundationAdvisory: String
+)
+
+data class HowToVideoGuide(
+    val id: String,
+    val title: String,
+    val category: String, // "soil_water" | "mold" | "shutoff" | "plumbing_roof" | "drainage"
+    val durationLabel: String,
+    val summary: String,
+    val stepByStepChecklist: List<String>,
+    val videoSearchUrl: String,
+    val videoPromptHint: String
+)
+
+data class HomeAzAiInspection(
+    val mode: String, // "az_photo" | "exterior_video" | "future_home"
+    val calmingReassurance: String,
+    val detectedIssueTitle: String,
+    val severityLabel: String, // "Low" | "Moderate" | "Urgent"
+    val recommendedTrade: String,
+    val recommendedSpecialtyKey: String,
+    val scopeOfWork: String,
+    val estimatedPriceLowUsd: Int,
+    val estimatedPriceHighUsd: Int,
+    val geologicalAndElevationNotes: String,
+    val lifeExpectancyForecast: String,
+    val plumbingAndPipeCorrosionFindings: String,
+    val drainageAndErosionFindings: String,
+    val needsHygienistAirOrTapeTest: Boolean,
+    val needsEquipmentRental: Boolean,
+    val diyImmediateSteps: List<String>,
+    val relatedVideoCategory: String
+)
+
+data class OnlineVerifiedContractorLead(
+    val companyName: String,
+    val tradeSummary: String,
+    val licenseOrRatingHint: String,
+    val verificationUrl: String,
+    val domain: String,
+    val reasonMatched: String
+)
+
+data class FieldScoutRankEntry(
+    val rank: Int,
+    val userId: String,
+    val displayName: String,
+    val city: String,
+    val verifiedReportsCount: Int,
+    val mediaReportsCount: Int,
+    val outcomesLoggedCount: Int,
+    val points: Int,
+    val freeSubscriptionEarned: Boolean,
+    val paidScoutEligible: Boolean
+)
+
+data class BuildingProblemCategoryAssessment(
+    val category: String,
+    val riskLevel: String, // "None Observed" | "Low" | "Moderate" | "Elevated" | "Urgent"
+    val visualIndicatorsFound: List<String>,
+    val detailedAnalysis: String,
+    val realLifeProblemsThatCanOccur: List<String>,
+    val recommendedActions: List<String>,
+    val recommendedTradeKey: String
+)
+
+data class BuildingPhotoAiAnalysis(
+    val inspectedPortion: String,
+    val buildingType: String,
+    val overallCondition: String,
+    val overallRiskBadge: String, // "Low" | "Moderate" | "Elevated" | "Urgent"
+    val summary: String,
+    val visualHighlightsSummary: String,
+    val drainage: BuildingProblemCategoryAssessment,
+    val roofing: BuildingProblemCategoryAssessment,
+    val foundation: BuildingProblemCategoryAssessment,
+    val additionalPortionFindings: BuildingProblemCategoryAssessment,
+    val realLifeRisksIfIgnored: List<String>,
+    val actionableSuggestions: List<String>,
+    val estimatedRepairRangeUsd: String,
+    val topRecommendedSpecialtyKey: String
+)
+
+data class DiyPestSupplyItem(
+    val name: String,
+    val purpose: String,
+    val websiteUrl: String,
+    val category: String
+)
+
+data class TermiteStrategyComparison(
+    val methodTitle: String,
+    val residualProtection: String,
+    val pros: String,
+    val cons: String,
+    val verdict: String
+)
+
+data class PestControlAiAnalysis(
+    val suspectedCurrentProblem: String,
+    val pestCategory: String, // "rodent_entry" | "termite" | "insect_crawling" | "moisture_pest" | "wildlife_burrow" | "general_pest"
+    val urgencyLevel: String, // "Low" | "Moderate" | "Elevated" | "Urgent"
+    val confidenceSummary: String,
+    val obviousSignsDetected: List<String>,
+    val howToSealAndExcludeSteps: List<String>,
+    val treatmentAndResidualInsight: String,
+    val termiteStrategyNote: String,
+    val diySuppliesNeeded: List<DiyPestSupplyItem>,
+    val shouldCallLicensedPro: Boolean,
+    val recommendedProReason: String
 )
 
 

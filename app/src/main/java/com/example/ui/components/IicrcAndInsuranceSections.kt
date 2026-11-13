@@ -65,12 +65,14 @@ import com.example.data.model.GroundedCreditLink
 import com.example.data.model.IicrcAuditRecord
 import com.example.data.model.InsuranceCarrierProfile
 import com.example.data.model.InsuranceClaimThread
+import com.example.data.model.InsurancePolicyOffer
 import com.example.data.model.UserProfile
 import com.example.ui.UiState
 import com.example.ui.WaterTableViewModel
 import com.example.ui.theme.FloodAmber
 import com.example.ui.theme.FloodCrimson
 import com.example.ui.theme.SafeEmerald
+import kotlin.math.roundToInt
 
 @Composable
 fun IicrcGovernanceBoardSection(
@@ -395,6 +397,10 @@ fun InsuranceHubSection(
     carriers: List<InsuranceCarrierProfile>,
     claims: List<InsuranceClaimThread>,
     contractors: List<ContractorProfile>,
+    telemetryDiscountPercent: Int = 0,
+    myPolicyOffers: List<InsurancePolicyOffer> = emptyList(),
+    openPolicyQuotes: List<InsurancePolicyOffer> = emptyList(),
+    insurerPolicyOffers: List<InsurancePolicyOffer> = emptyList(),
     defaultCity: String,
     isSubmitting: Boolean
 ) {
@@ -413,6 +419,13 @@ fun InsuranceHubSection(
     var deductibleText by remember(userProfile?.linkedDeductibleUsd) {
         mutableStateOf((userProfile?.linkedDeductibleUsd ?: 1000).toString())
     }
+
+    // Direct Policy Quote & Telemetry Discount state
+    var quoteCoverageType by remember { mutableStateOf("homeowners_ho3") }
+    var quoteLimitText by remember { mutableStateOf("450000") }
+    var quoteBasePremiumText by remember { mutableStateOf("185") }
+    var quotePropertyLabel by remember { mutableStateOf("Primary Home") }
+    var quoteTerms by remember { mutableStateOf("") }
 
     // Open New Claim Thread state
     var claimContractor by remember(contractors) { mutableStateOf(contractors.firstOrNull()) }
@@ -434,11 +447,129 @@ fun InsuranceHubSection(
     var insTurnaround by remember(myCarrierProfile) { mutableStateOf((myCarrierProfile?.avgTurnaroundHours ?: 24).toString()) }
     var insBio by remember(myCarrierProfile) { mutableStateOf(myCarrierProfile?.bio ?: "") }
 
+    val mergedPolicies = remember(myPolicyOffers, openPolicyQuotes, insurerPolicyOffers) {
+        (myPolicyOffers + insurerPolicyOffers + openPolicyQuotes).distinctBy { it.id }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // 0. Telemetry Rate Discount & Direct In-App Policies
+        item {
+            val basePrem = quoteBasePremiumText.toIntOrNull()?.coerceAtLeast(30) ?: 185
+            val discountedPrem = (basePrem * (100 - telemetryDiscountPercent) / 100.0).roundToInt().coerceAtLeast(25)
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFECFDF5))
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Telemetry Rate Discount & Direct Policies", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = SafeEmerald)
+                        Surface(color = Color(0xFFD1FAE5), shape = RoundedCornerShape(50)) {
+                            Text(
+                                text = "-$telemetryDiscountPercent% Earned",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = SafeEmerald,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                    Text(
+                        text = "Your verified property updates, field pins & mitigation outcomes earn insurers live risk clarity—lowering estimated premiums from $$basePrem/mo to $$discountedPrem/mo.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(
+                            "homeowners_ho3" to "Homeowners HO-3",
+                            "flood_nfip" to "Flood Policy",
+                            "wildfire_dic" to "Wildfire / DIC",
+                            "landlord" to "Landlord"
+                        ).forEach { (k, label) ->
+                            FilterChip(selected = quoteCoverageType == k, onClick = { quoteCoverageType = k }, label = { Text(label) })
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(value = quotePropertyLabel, onValueChange = { quotePropertyLabel = it }, label = { Text("Property") }, singleLine = true, modifier = Modifier.weight(1f))
+                        OutlinedTextField(value = quoteLimitText, onValueChange = { quoteLimitText = it.filter { c -> c.isDigit() } }, label = { Text("Limit $") }, singleLine = true, modifier = Modifier.weight(0.9f))
+                        OutlinedTextField(value = quoteBasePremiumText, onValueChange = { quoteBasePremiumText = it.filter { c -> c.isDigit() } }, label = { Text("Base $/mo") }, singleLine = true, modifier = Modifier.weight(0.75f))
+                    }
+                    OutlinedTextField(
+                        value = quoteTerms,
+                        onValueChange = { quoteTerms = it },
+                        label = { Text("Property updates, roof/pipe mitigation or policy notes") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(
+                        onClick = {
+                            val isCarrier = myCarrierProfile != null
+                            viewModel.requestOrIssueInsurancePolicy(
+                                isCarrierIssuingQuote = isCarrier,
+                                insurerUserId = myCarrierProfile?.userId ?: (selectedCarrier?.userId ?: "open_quote"),
+                                carrierName = myCarrierProfile?.carrierName ?: customCarrierName.ifBlank { selectedCarrier?.carrierName ?: "Verified Carrier Marketplace" },
+                                targetClientUserId = if (isCarrier) "open_quote" else viewModel.currentUserId,
+                                targetClientName = if (isCarrier) "Open Discounted Homeowner" else "",
+                                propertyLabel = quotePropertyLabel.ifBlank { "Primary Property" },
+                                city = defaultCity,
+                                coverageType = quoteCoverageType,
+                                coverageLimitUsd = quoteLimitText.toIntOrNull() ?: 450000,
+                                deductibleUsd = deductibleText.toIntOrNull() ?: 1000,
+                                baseMonthlyPremiumUsd = basePrem,
+                                telemetryDiscountPercent = telemetryDiscountPercent,
+                                policyTermsSummary = quoteTerms.ifBlank { "Live property updates verified on Insights ($telemetryDiscountPercent% telemetry discount applied)." }
+                            )
+                            quoteTerms = ""
+                        },
+                        enabled = !isSubmitting,
+                        modifier = Modifier.fillMaxWidth().height(48.dp).testTag("request_or_issue_policy_button")
+                    ) {
+                        Text(if (myCarrierProfile != null) "Issue Direct Policy Quote ($$discountedPrem/mo)" else "Request -$telemetryDiscountPercent% Discounted In-App Quote")
+                    }
+
+                    if (mergedPolicies.isNotEmpty()) {
+                        HorizontalDivider()
+                        Text("Active Policy Quotes & Bound Policies (${mergedPolicies.size})", style = MaterialTheme.typography.labelLarge)
+                        mergedPolicies.take(6).forEach { offer ->
+                            val isClientOwner = offer.clientUserId == viewModel.currentUserId || offer.clientUserId == "open_quote"
+                            val isInsurerOwner = offer.insurerUserId == viewModel.currentUserId
+                            Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("${offer.carrierName} · ${offer.coverageType.uppercase()}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                                        Text(offer.status.replace('_', ' ').uppercase(), style = MaterialTheme.typography.labelSmall, color = SafeEmerald, fontWeight = FontWeight.Bold)
+                                    }
+                                    Text(
+                                        text = "${offer.propertyLabel} (${offer.city}) · $${offer.discountedMonthlyPremiumUsd}/mo (was $${offer.baseMonthlyPremiumUsd}/mo · -${offer.telemetryDiscountPercent}%)",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    if (offer.policyTermsSummary.isNotBlank()) {
+                                        Text(offer.policyTermsSummary, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        if (isClientOwner && offer.status == "quoted") {
+                                            Button(
+                                                onClick = { viewModel.respondToInsurancePolicyOffer(offer.id, "client_accepted", asClientAccepting = true) },
+                                                modifier = Modifier.weight(1f)
+                                            ) { Text("Accept Policy") }
+                                        }
+                                        if (isInsurerOwner && (offer.status == "quoted" || offer.status == "client_accepted")) {
+                                            FilledTonalButton(
+                                                onClick = { viewModel.respondToInsurancePolicyOffer(offer.id, "bound", asClientAccepting = false) },
+                                                modifier = Modifier.weight(1f)
+                                            ) { Text("Bind Policy") }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // 1. Client Link Policy Card
         item {
             Card(

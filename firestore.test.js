@@ -686,5 +686,287 @@ test("Insurance carriers register profiles and streamline shared claims with cli
   }));
 });
 
+test("Saved properties enforce owner-only isolation and valid propertyType", async () => {
+  const alice = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bob = testEnv.authenticatedContext(BOB_UID).firestore();
+  const now = new Date();
+
+  const propPayload = {
+    userId: ALICE_UID,
+    label: "Family Home",
+    propertyType: "house",
+    address: "1420 Oak Ave",
+    city: "Sacramento",
+    state: "CA",
+    latitude: 38.5816,
+    longitude: -121.4944,
+    femaFloodZone: "Zone X (Low-Moderate)",
+    fireHazardZone: "Moderate WUI",
+    waterTableDepthFt: 6.5,
+    hazardSummary: "Shallow alluvial silt; check French drain before heavy winter storms.",
+    notifyPriorityAlerts: true,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await assertSucceeds(alice.collection("saved_properties").doc("prop_1").set(propPayload));
+  await assertSucceeds(alice.collection("saved_properties").where("userId", "==", ALICE_UID).get());
+  await assertFails(bob.collection("saved_properties").doc("prop_1").get());
+  await assertFails(bob.collection("saved_properties").where("userId", "==", ALICE_UID).get());
+  await assertFails(bob.collection("saved_properties").doc("prop_1").update({
+    notifyPriorityAlerts: false,
+    updatedAt: new Date(),
+  }));
+  await assertFails(alice.collection("saved_properties").doc("prop_bad").set({
+    ...propPayload,
+    propertyType: "warehouse",
+  }));
+});
+
+test("Contractor product reviews allow public reads and restrict edits/deletes to owner", async () => {
+  const alice = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bob = testEnv.authenticatedContext(BOB_UID).firestore();
+  const now = new Date();
+
+  await assertSucceeds(bob.collection("contractor_product_reviews").doc("prv_1").set({
+    userId: BOB_UID,
+    contractorName: "Bob Vance, WRT",
+    companyName: "Sierra Mitigation",
+    licenseNumber: "CSLB-901122",
+    productSku: "WT-PUMP-12V",
+    productName: "12V Battery Backup Sump System",
+    brandModel: "Zoeller Pro Pak",
+    category: "Sump Pumps",
+    disasterUseCase: "flooding",
+    rating: 5,
+    jobsUsedCount: 28,
+    pros: "Survived 14-hour PG&E outage during storm surge.",
+    cons: "Heavy marine battery needed.",
+    honestReview: "Essential in high water table neighborhoods where power drops first.",
+    wouldUseOnInsuredJob: true,
+    isPublic: true,
+    createdAt: now,
+    updatedAt: now,
+  }));
+
+  await assertSucceeds(alice.collection("contractor_product_reviews").where("isPublic", "==", true).get());
+  await assertFails(alice.collection("contractor_product_reviews").doc("prv_1").delete());
+  await assertSucceeds(bob.collection("contractor_product_reviews").doc("prv_1").delete());
+});
+
+test("Equipment rentals allow signed-in browse and owner-only modify/delete", async () => {
+  const alice = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bob = testEnv.authenticatedContext(BOB_UID).firestore();
+  const now = new Date();
+
+  await assertSucceeds(bob.collection("equipment_rentals").doc("rnt_1").set({
+    ownerUserId: BOB_UID,
+    ownerName: "Bob Vance",
+    ownerType: "restoration_company",
+    companyName: "Sierra Mitigation",
+    equipmentName: "Dri-Eaz LGR 7000XLi Dehumidifier",
+    category: "Dehumidifier",
+    city: "Sacramento",
+    dailyRateUsd: 65,
+    depositUsd: 200,
+    specs: "130 pints/day AHAM, integrated humidistat.",
+    contactPhoneOrNote: "Call dispatch 916-555-0140",
+    isAvailable: true,
+    createdAt: now,
+    updatedAt: now,
+  }));
+
+  await assertSucceeds(alice.collection("equipment_rentals").get());
+  await assertFails(alice.collection("equipment_rentals").doc("rnt_1").update({
+    isAvailable: false,
+    updatedAt: new Date(),
+  }));
+  await assertFails(alice.collection("equipment_rentals").doc("rnt_1").delete());
+  await assertSucceeds(bob.collection("equipment_rentals").doc("rnt_1").update({
+    isAvailable: false,
+    updatedAt: new Date(),
+  }));
+});
+
+test("App revision suggestions allow upvote increments but block status spoofing", async () => {
+  const alice = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bob = testEnv.authenticatedContext(BOB_UID).firestore();
+  const now = new Date();
+
+  await assertSucceeds(bob.collection("app_revision_suggestions").doc("sug_1").set({
+    userId: BOB_UID,
+    authorName: "Bob Vance, Landscaper",
+    authorRole: "contractor",
+    tradeOrSpecialty: "landscaper",
+    title: "Add French drain gravel depth calculator",
+    category: "Workflow",
+    description: "Helps homeowners estimate #57 crushed rock tonnage accurately before trenching.",
+    upvotesCount: 0,
+    status: "submitted",
+    createdAt: now,
+    updatedAt: now,
+  }));
+
+  await assertSucceeds(alice.collection("app_revision_suggestions").doc("sug_1").update({
+    upvotesCount: 1,
+    updatedAt: new Date(),
+  }));
+
+  await assertFails(alice.collection("app_revision_suggestions").doc("sug_1").update({
+    upvotesCount: 50,
+    updatedAt: new Date(),
+  }));
+
+  await assertFails(alice.collection("app_revision_suggestions").doc("sug_1").update({
+    status: "shipped",
+    updatedAt: new Date(),
+  }));
+});
+
+test("Hygienist sample requests allow qualified hygienists to claim and block regular non-pros", async () => {
+  const alice = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bob = testEnv.authenticatedContext(BOB_UID).firestore();
+  const carol = testEnv.authenticatedContext(CAROL_UID).firestore();
+  const now = new Date();
+
+  await assertSucceeds(bob.collection("contractors").doc(BOB_UID).set({
+    ...validContractorPayload(BOB_UID),
+    specialty: "industrial_hygienist",
+    displayName: "Dr. Bob CIH",
+  }));
+
+  await assertSucceeds(alice.collection("hygienist_requests").doc("hyg_1").set({
+    clientUserId: ALICE_UID,
+    clientName: "Alice R.",
+    hygienistUserId: "open_marketplace",
+    hygienistName: "",
+    city: "Sacramento",
+    propertyAddressHint: "Oak Ave Basement",
+    sampleTypes: ["Air Spore Trap", "Surface Tape Lift"],
+    reasonNotes: "Musty odor after crawlspace seepage",
+    status: "requested",
+    quotedFeeUsd: 0,
+    labFindingsSummary: "",
+    createdAt: now,
+    updatedAt: now,
+  }));
+
+  // Non-contractor Carol cannot claim hygienist request
+  await assertFails(carol.collection("hygienist_requests").doc("hyg_1").update({
+    hygienistUserId: CAROL_UID,
+    hygienistName: "Carol Fake",
+    status: "accepted",
+    quotedFeeUsd: 350,
+    labFindingsSummary: "Fake",
+    updatedAt: new Date(),
+  }));
+
+  // Qualified hygienist Bob CAN claim & post lab findings
+  await assertSucceeds(bob.collection("hygienist_requests").doc("hyg_1").update({
+    hygienistUserId: BOB_UID,
+    hygienistName: "Dr. Bob CIH",
+    status: "lab_report_ready",
+    quotedFeeUsd: 425,
+    labFindingsSummary: "Penicillium/Aspergillus tape lift elevated behind baseboard; clearance pass after HEPA.",
+    updatedAt: new Date(),
+  }));
+});
+
+test("Insurance policies support quotes, client acceptance, carrier binding, and block cross-party tampering", async () => {
+  const alice = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bob = testEnv.authenticatedContext(BOB_UID).firestore();
+  const carol = testEnv.authenticatedContext(CAROL_UID).firestore();
+  const now = new Date();
+
+  await assertSucceeds(carol.collection("insurance_carriers").doc(CAROL_UID).set({
+    userId: CAROL_UID,
+    carrierName: "Pacific Shield Homeowners Insurance",
+    adjusterName: "Carol M.",
+    licenseOrNaicCode: "NAIC-44910",
+    claimsEmail: "claims@pacificshield.example.com",
+    claimsPhone: "800-555-0199",
+    claimsPortalUrl: "https://pacificshield.example.com/claims",
+    serviceRegions: ["Sacramento", "Los Angeles"],
+    supportsDirectRestorationBilling: true,
+    avgTurnaroundHours: 12,
+    bio: "Telemetry-discounted homeowners coverage.",
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+  }));
+
+  const quotePayload = {
+    insurerUserId: CAROL_UID,
+    carrierName: "Pacific Shield Homeowners Insurance",
+    clientUserId: "open_quote",
+    clientName: "",
+    propertyLabel: "AllVerified Zone X Homes",
+    city: "Sacramento",
+    coverageType: "homeowners_ho3",
+    coverageLimitUsd: 550000,
+    deductibleUsd: 1500,
+    baseMonthlyPremiumUsd: 210,
+    telemetryDiscountPercent: 18,
+    discountedMonthlyPremiumUsd: 172,
+    policyTermsSummary: "18% discount with active Insights telemetry alerts & sump logs.",
+    status: "quoted",
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await assertSucceeds(carol.collection("insurance_policies").doc("pol_1").set(quotePayload));
+  // Random user Bob cannot create a carrier quote without insurance_carriers doc
+  await assertFails(bob.collection("insurance_policies").doc("pol_fake").set({
+    ...quotePayload,
+    insurerUserId: BOB_UID,
+  }));
+
+  // Client Alice accepts open quote, but cannot alter monthly premium
+  await assertFails(alice.collection("insurance_policies").doc("pol_1").update({
+    clientUserId: ALICE_UID,
+    clientName: "Alice R.",
+    status: "client_accepted",
+    discountedMonthlyPremiumUsd: 10,
+    updatedAt: new Date(),
+  }));
+
+  await assertSucceeds(alice.collection("insurance_policies").doc("pol_1").update({
+    clientUserId: ALICE_UID,
+    clientName: "Alice R.",
+    status: "client_accepted",
+    updatedAt: new Date(),
+  }));
+
+  // Insurer Carol binds accepted policy
+  await assertSucceeds(carol.collection("insurance_policies").doc("pol_1").update({
+    status: "bound",
+    updatedAt: new Date(),
+  }));
+});
+
+test("Field scout applications enforce owner-only reads and creates", async () => {
+  const alice = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bob = testEnv.authenticatedContext(BOB_UID).firestore();
+  const now = new Date();
+
+  await assertSucceeds(alice.collection("field_scout_applications").doc("sct_1").set({
+    userId: ALICE_UID,
+    applicantName: "Alice R.",
+    city: "Sacramento",
+    scoutScore: 145,
+    verifiedReportsCount: 4,
+    availabilitySummary: "Evenings & Weekends",
+    coverageNotes: "Covering Midtown & East Sac drainage corridors.",
+    status: "applied",
+    createdAt: now,
+    updatedAt: now,
+  }));
+
+  await assertSucceeds(alice.collection("field_scout_applications").where("userId", "==", ALICE_UID).get());
+  await assertFails(bob.collection("field_scout_applications").doc("sct_1").get());
+  await assertFails(bob.collection("field_scout_applications").where("userId", "==", ALICE_UID).get());
+});
+
+
 
 

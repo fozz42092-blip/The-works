@@ -13,6 +13,8 @@ import com.example.data.catalog.WaterTableCatalogs
 import com.example.data.export.WorkAuthorizationPdfGenerator
 import com.example.data.model.AdaptiveSolutionStat
 import com.example.data.model.AiMatchConciergeVerdict
+import com.example.data.model.AppRevisionSuggestion
+import com.example.data.model.BuildingPhotoAiAnalysis
 import com.example.data.model.CartItem
 import com.example.data.model.CityFloodForecast
 import com.example.data.model.ConsultationRequest
@@ -23,22 +25,34 @@ import com.example.data.model.ContractorMatchResult
 import com.example.data.model.ContractorPortfolioItem
 import com.example.data.model.ProblemMatchQuery
 import com.example.data.model.ContractorProfile
+import com.example.data.model.ContractorProductReview
 import com.example.data.model.ContractorReputation
 import com.example.data.model.ContractorReview
 import com.example.data.model.CslbVerificationResult
+import com.example.data.model.EquipmentRentalItem
 import com.example.data.model.ExternalContractorGlassWallGroup
+import com.example.data.model.FieldScoutApplication
+import com.example.data.model.FieldScoutRankEntry
 import com.example.data.model.GeneratedVideoClip
 import com.example.data.model.GeoCityResult
 import com.example.data.model.GeoLocationPoint
 import com.example.data.model.GroundedCreditLink
 import com.example.data.model.GroundwaterAiDiagnosis
+import com.example.data.model.HomeAzAiInspection
+import com.example.data.model.HygienistSampleRequest
 import com.example.data.model.IicrcAuditRecord
 import com.example.data.model.InsuranceCarrierProfile
 import com.example.data.model.InsuranceClaimThread
+import com.example.data.model.InsurancePolicyOffer
 import com.example.data.model.JobKitRecommendation
+import com.example.data.model.LiveDisasterEvent
 import com.example.data.model.LocalFloodNewsItem
 import com.example.data.model.ModerationTicket
 import com.example.data.model.NwsAlert
+import com.example.data.model.OnlineVerifiedContractorLead
+import com.example.data.model.PestControlAiAnalysis
+import com.example.data.model.PropertyHazardHistory
+import com.example.data.model.SavedMonitoredProperty
 import com.example.data.model.SolutionOutcome
 import com.example.data.model.StreetFloodRiskSummary
 import com.example.data.model.SupplyOrder
@@ -218,6 +232,108 @@ class WaterTableViewModel(
             .catch { emit(unwrapFlowError(it, "insurer claim inbox")) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Loading)
 
+    val savedPropertiesState: StateFlow<UiState<List<SavedMonitoredProperty>>> =
+        repository.observeMySavedProperties()
+            .map<List<SavedMonitoredProperty>, UiState<List<SavedMonitoredProperty>>> { UiState.Success(it) }
+            .catch { emit(unwrapFlowError(it, "saved properties")) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Loading)
+
+    val productReviewsState: StateFlow<UiState<List<ContractorProductReview>>> =
+        repository.observeContractorProductReviews()
+            .map<List<ContractorProductReview>, UiState<List<ContractorProductReview>>> { UiState.Success(it) }
+            .catch { emit(unwrapFlowError(it, "contractor product field reviews")) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Loading)
+
+    val equipmentRentalsState: StateFlow<UiState<List<EquipmentRentalItem>>> =
+        repository.observeEquipmentRentals()
+            .map<List<EquipmentRentalItem>, UiState<List<EquipmentRentalItem>>> { UiState.Success(it) }
+            .catch { emit(unwrapFlowError(it, "equipment rentals")) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Loading)
+
+    val appSuggestionsState: StateFlow<UiState<List<AppRevisionSuggestion>>> =
+        repository.observeAppRevisionSuggestions()
+            .map<List<AppRevisionSuggestion>, UiState<List<AppRevisionSuggestion>>> { UiState.Success(it) }
+            .catch { emit(unwrapFlowError(it, "app revision suggestions")) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Loading)
+
+    val myHygienistRequestsState: StateFlow<UiState<List<HygienistSampleRequest>>> =
+        repository.observeMyHygienistRequests()
+            .map<List<HygienistSampleRequest>, UiState<List<HygienistSampleRequest>>> { UiState.Success(it) }
+            .catch { emit(unwrapFlowError(it, "hygienist requests")) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Loading)
+
+    val openHygienistRequestsState: StateFlow<UiState<List<HygienistSampleRequest>>> =
+        repository.observeOpenHygienistMarketplace()
+            .map<List<HygienistSampleRequest>, UiState<List<HygienistSampleRequest>>> { UiState.Success(it) }
+            .catch { emit(unwrapFlowError(it, "hygienist marketplace")) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Loading)
+
+    val assignedHygienistRequestsState: StateFlow<UiState<List<HygienistSampleRequest>>> =
+        repository.observeAssignedHygienistRequests()
+            .map<List<HygienistSampleRequest>, UiState<List<HygienistSampleRequest>>> { UiState.Success(it) }
+            .catch { emit(unwrapFlowError(it, "assigned hygienist jobs")) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Loading)
+
+    val myPolicyOffersState: StateFlow<UiState<List<InsurancePolicyOffer>>> =
+        repository.observeMyClientPolicyOffers()
+            .map<List<InsurancePolicyOffer>, UiState<List<InsurancePolicyOffer>>> { UiState.Success(it) }
+            .catch { emit(unwrapFlowError(it, "my policy offers")) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Loading)
+
+    val openPolicyQuotesState: StateFlow<UiState<List<InsurancePolicyOffer>>> =
+        repository.observeOpenInsuranceQuotes()
+            .map<List<InsurancePolicyOffer>, UiState<List<InsurancePolicyOffer>>> { UiState.Success(it) }
+            .catch { emit(unwrapFlowError(it, "open insurance quotes")) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Loading)
+
+    val insurerPolicyOffersState: StateFlow<UiState<List<InsurancePolicyOffer>>> =
+        repository.observeInsurerIssuedPolicies()
+            .map<List<InsurancePolicyOffer>, UiState<List<InsurancePolicyOffer>>> { UiState.Success(it) }
+            .catch { emit(unwrapFlowError(it, "insurer policies")) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Loading)
+
+    val fieldScoutAppsState: StateFlow<UiState<List<FieldScoutApplication>>> =
+        repository.observeMyFieldScoutApplications()
+            .map<List<FieldScoutApplication>, UiState<List<FieldScoutApplication>>> { UiState.Success(it) }
+            .catch { emit(unwrapFlowError(it, "field scout applications")) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), UiState.Loading)
+
+    private val _liveDisastersState = MutableStateFlow<UiState<List<LiveDisasterEvent>>>(UiState.Loading)
+    val liveDisastersState: StateFlow<UiState<List<LiveDisasterEvent>>> = _liveDisastersState.asStateFlow()
+
+    private val _propertyHistoryState = MutableStateFlow<UiState<PropertyHazardHistory>?>(null)
+    val propertyHistoryState: StateFlow<UiState<PropertyHazardHistory>?> = _propertyHistoryState.asStateFlow()
+
+    private val _azHomeInspectionState = MutableStateFlow<UiState<HomeAzAiInspection>?>(null)
+    val azHomeInspectionState: StateFlow<UiState<HomeAzAiInspection>?> = _azHomeInspectionState.asStateFlow()
+
+    private val _onlineContractorLeadsState = MutableStateFlow<UiState<List<OnlineVerifiedContractorLead>>?>(null)
+    val onlineContractorLeadsState: StateFlow<UiState<List<OnlineVerifiedContractorLead>>?> = _onlineContractorLeadsState.asStateFlow()
+
+    private val _selectedSoilFromBottleTest = MutableStateFlow<String?>(null)
+    val selectedSoilFromBottleTest: StateFlow<String?> = _selectedSoilFromBottleTest.asStateFlow()
+
+    val fieldScoutLeaderboard: StateFlow<List<FieldScoutRankEntry>> =
+        combine(reportsState, outcomesState) { repUi, outUi ->
+            WaterTableCatalogs.computeFieldScoutLeaderboard(
+                reports = (repUi as? UiState.Success)?.data.orEmpty(),
+                outcomes = (outUi as? UiState.Success)?.data.orEmpty()
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyList())
+
+    val userTelemetryDiscountPercent: StateFlow<Int> =
+        combine(savedPropertiesState, myReportsState, outcomesState) { propsUi, myRepUi, outUi ->
+            val props = (propsUi as? UiState.Success)?.data.orEmpty()
+            val myReps = (myRepUi as? UiState.Success)?.data.orEmpty()
+            val outs = (outUi as? UiState.Success)?.data.orEmpty().filter { it.userId == currentUserId }
+            WaterTableCatalogs.computeTelemetryInsuranceDiscount(
+                verifiedPropertiesCount = props.size,
+                reportsCount = myReps.size,
+                outcomesCount = outs.size,
+                mitigationScoreBonus = if (myReps.any { it.solutionWorked }) 4 else 0
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0)
+
     private val _weatherNewsState = MutableStateFlow(WeatherNewsUiState())
     val weatherNewsState: StateFlow<WeatherNewsUiState> = _weatherNewsState.asStateFlow()
 
@@ -353,6 +469,24 @@ class WaterTableViewModel(
 
     private val _extraPhotos = MutableStateFlow<List<MediaAttachment>>(emptyList())
     val extraPhotos: StateFlow<List<MediaAttachment>> = _extraPhotos.asStateFlow()
+
+    private val _buildingPhotoAttachment = MutableStateFlow<MediaAttachment?>(null)
+    val buildingPhotoAttachment: StateFlow<MediaAttachment?> = _buildingPhotoAttachment.asStateFlow()
+
+    private val _buildingExtraPhotos = MutableStateFlow<List<MediaAttachment>>(emptyList())
+    val buildingExtraPhotos: StateFlow<List<MediaAttachment>> = _buildingExtraPhotos.asStateFlow()
+
+    private val _buildingPhotoAnalysisState = MutableStateFlow<UiState<BuildingPhotoAiAnalysis>?>(null)
+    val buildingPhotoAnalysisState: StateFlow<UiState<BuildingPhotoAiAnalysis>?> = _buildingPhotoAnalysisState.asStateFlow()
+
+    private val _pestPhotoAttachment = MutableStateFlow<MediaAttachment?>(null)
+    val pestPhotoAttachment: StateFlow<MediaAttachment?> = _pestPhotoAttachment.asStateFlow()
+
+    private val _pestExtraPhotos = MutableStateFlow<List<MediaAttachment>>(emptyList())
+    val pestExtraPhotos: StateFlow<List<MediaAttachment>> = _pestExtraPhotos.asStateFlow()
+
+    private val _pestAnalysisState = MutableStateFlow<UiState<PestControlAiAnalysis>?>(null)
+    val pestAnalysisState: StateFlow<UiState<PestControlAiAnalysis>?> = _pestAnalysisState.asStateFlow()
 
     private val _reviewProofAttachment = MutableStateFlow<MediaAttachment?>(null)
     val reviewProofAttachment: StateFlow<MediaAttachment?> = _reviewProofAttachment.asStateFlow()
@@ -562,16 +696,39 @@ class WaterTableViewModel(
             val forecastRes = forecastDeferred.await()
             val alertsRes = alertsDeferred.await()
             val newsRes = newsDeferred.await()
-
+            val resolvedAlerts = alertsRes.getOrNull() ?: emptyList()
             _weatherNewsState.update { curr ->
                 curr.copy(
                     isLoading = false,
                     forecast = forecastRes.getOrNull() ?: curr.forecast,
-                    alerts = alertsRes.getOrNull() ?: emptyList(),
+                    alerts = resolvedAlerts,
                     newsItems = newsRes.getOrNull() ?: emptyList(),
                     errorMessage = forecastRes.exceptionOrNull()?.localizedMessage
                 )
             }
+            refreshLiveDisastersInternal(city, lat, lon, resolvedAlerts)
+        }
+    }
+
+    private suspend fun refreshLiveDisastersInternal(
+        city: String,
+        lat: Double,
+        lon: Double,
+        alerts: List<NwsAlert>
+    ) {
+        val props = (savedPropertiesState.value as? UiState.Success)?.data.orEmpty()
+        runCatching {
+            weatherNewsRepo.fetchLiveDisasters(
+                centerLat = lat,
+                centerLon = lon,
+                city = city,
+                alerts = alerts,
+                monitoredProperties = props
+            )
+        }.onSuccess { events ->
+            _liveDisastersState.value = UiState.Success(events)
+        }.onFailure { err ->
+            _liveDisastersState.value = UiState.Error(err.localizedMessage ?: "Live disasters feed unavailable")
         }
     }
 
@@ -611,6 +768,83 @@ class WaterTableViewModel(
 
     fun clearMediaAttachment() {
         _mediaAttachment.value = null
+    }
+
+    fun attachBuildingPhotoFromUri(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { extractImagePreview(context, uri, 960, 480) }
+            if (result != null) {
+                _buildingPhotoAttachment.value = result
+            } else {
+                _statusBanner.value = "Could not load selected building photo."
+            }
+        }
+    }
+
+    fun addBuildingExtraPhotoFromUri(context: Context, uri: Uri) {
+        if (_buildingExtraPhotos.value.size >= 3) {
+            _statusBanner.value = "Maximum of 4 building photos (1 primary + 3 angles) reached."
+            return
+        }
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { extractImagePreview(context, uri, 720, 360) }
+            if (result != null) {
+                _buildingExtraPhotos.update { (it + result).take(3) }
+            }
+        }
+    }
+
+    fun removeBuildingExtraPhotoAt(index: Int) {
+        _buildingExtraPhotos.update { list -> list.filterIndexed { i, _ -> i != index } }
+    }
+
+    fun clearBuildingPrimaryPhoto() {
+        _buildingPhotoAttachment.value = null
+        _buildingPhotoAnalysisState.value = null
+    }
+
+    fun clearAllBuildingPhotos() {
+        _buildingPhotoAttachment.value = null
+        _buildingExtraPhotos.value = emptyList()
+        _buildingPhotoAnalysisState.value = null
+    }
+
+    fun attachPestPhotoFromUri(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { extractImagePreview(context, uri, 960, 480) }
+            if (result != null) {
+                _pestPhotoAttachment.value = result
+            } else {
+                _statusBanner.value = "Could not load selected pest/entry photo."
+            }
+        }
+    }
+
+    fun addPestExtraPhotoFromUri(context: Context, uri: Uri) {
+        if (_pestExtraPhotos.value.size >= 3) {
+            _statusBanner.value = "Maximum of 4 pest photos (1 primary + 3 angles) reached."
+            return
+        }
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { extractImagePreview(context, uri, 720, 360) }
+            if (result != null) {
+                _pestExtraPhotos.update { (it + result).take(3) }
+            }
+        }
+    }
+
+    fun removePestExtraPhotoAt(index: Int) {
+        _pestExtraPhotos.update { list -> list.filterIndexed { i, _ -> i != index } }
+    }
+
+    fun clearPestPrimaryPhoto() {
+        _pestPhotoAttachment.value = null
+    }
+
+    fun clearAllPestPhotos() {
+        _pestPhotoAttachment.value = null
+        _pestExtraPhotos.value = emptyList()
+        _pestAnalysisState.value = null
     }
 
     fun attachReviewProofFromUri(context: Context, uri: Uri) {
@@ -1793,6 +2027,595 @@ class WaterTableViewModel(
                 _statusBanner.value = "Claim thread updated for Client, Contractor & Insurer!"
             }.onFailure {
                 _statusBanner.value = it.localizedMessage ?: "Failed to update claim thread"
+            }
+            _isSubmitting.value = false
+        }
+    }
+
+    // --- Live Disasters, House/Land History, Elevation & Saved Property Watch ---
+
+    fun refreshLiveDisastersNow() {
+        val w = _weatherNewsState.value
+        viewModelScope.launch {
+            _liveDisastersState.value = UiState.Loading
+            refreshLiveDisastersInternal(w.selectedCity, w.latitude, w.longitude, w.alerts)
+        }
+    }
+
+    fun lookupAddressAndGenerateHistory(
+        label: String,
+        propertyType: String,
+        addressQuery: String
+    ) {
+        viewModelScope.launch {
+            _propertyHistoryState.value = UiState.Loading
+            val w = _weatherNewsState.value
+            val (geo, femaZone, floodDesc) = weatherNewsRepo.lookupAddressAndFemaFloodZone(
+                addressQuery = addressQuery.ifBlank { "${w.selectedCity}, ${w.selectedState}" },
+                fallbackLat = w.latitude,
+                fallbackLon = w.longitude,
+                fallbackCity = w.selectedCity,
+                fallbackState = w.selectedState
+            )
+            val (elevationFt, stormDays) = weatherNewsRepo.fetchElevationAndMotherNatureHistory(
+                latitude = geo.latitude,
+                longitude = geo.longitude
+            )
+            val reports = (reportsState.value as? UiState.Success)?.data.orEmpty()
+            val disasters = (_liveDisastersState.value as? UiState.Success)?.data.orEmpty()
+            val nearby = reports.filter {
+                WaterTableCatalogs.distanceMiles(geo.latitude, geo.longitude, it.latitude, it.longitude) <= 25.0 ||
+                    it.city.equals(geo.name, ignoreCase = true)
+            }
+            aiRepo.generatePropertyHazardHistoryDossier(
+                label = label.ifBlank { addressQuery.ifBlank { geo.name } },
+                propertyType = propertyType,
+                address = addressQuery.ifBlank { "${geo.name}, ${geo.admin1}" },
+                city = geo.name,
+                state = geo.admin1,
+                latitude = geo.latitude,
+                longitude = geo.longitude,
+                femaFloodZone = femaZone,
+                floodRiskDesc = floodDesc,
+                nearbyReports = nearby,
+                liveDisasters = disasters,
+                elevationFeet = elevationFt,
+                historicalStormDays = stormDays
+            ).onSuccess { history ->
+                _propertyHistoryState.value = UiState.Success(history)
+            }.onFailure { err ->
+                _propertyHistoryState.value = UiState.Error(err.localizedMessage ?: "Hazard lookup failed")
+            }
+        }
+    }
+
+    fun saveMonitoredPropertyFromHistory(history: PropertyHazardHistory) {
+        viewModelScope.launch {
+            _isSubmitting.value = true
+            repository.saveMonitoredProperty(
+                label = history.label,
+                propertyType = history.propertyType,
+                address = history.address,
+                city = history.city,
+                state = history.state,
+                latitude = history.latitude,
+                longitude = history.longitude,
+                femaFloodZone = history.femaFloodZone,
+                fireHazardZone = history.fireHazardZone,
+                waterTableDepthFt = history.nearestReportDepthFt ?: 0.0,
+                hazardSummary = "${history.elevationFeet} ft elev · ${history.landBeforeHouseBuilt.ifBlank { history.aiHistoricalDossier }}".take(750),
+                notifyPriorityAlerts = true
+            ).onSuccess {
+                _statusBanner.value = "Property '${history.label}' saved for priority hazard monitoring!"
+                refreshLiveDisastersNow()
+            }.onFailure {
+                _statusBanner.value = it.localizedMessage ?: "Failed to save property"
+            }
+            _isSubmitting.value = false
+        }
+    }
+
+    fun toggleSavedPropertyAlert(propertyId: String, enabled: Boolean) {
+        viewModelScope.launch {
+            repository.togglePropertyAlert(propertyId, enabled)
+                .onSuccess { _statusBanner.value = if (enabled) "Priority alerts enabled for property." else "Property alerts paused." }
+                .onFailure { _statusBanner.value = it.localizedMessage ?: "Could not update property alerts" }
+        }
+    }
+
+    fun deleteSavedProperty(propertyId: String) {
+        viewModelScope.launch {
+            repository.deleteSavedProperty(propertyId)
+                .onSuccess { _statusBanner.value = "Removed monitored property." }
+                .onFailure { _statusBanner.value = it.localizedMessage ?: "Could not remove property" }
+        }
+    }
+
+    // --- Calming A-Z Home AI, Multi-Frame Exterior Video Walkaround, & Online Pro Search ---
+
+    fun setSelectedSoilTypeFromBottleTest(soilTypeKey: String) {
+        _selectedSoilFromBottleTest.value = soilTypeKey
+        _statusBanner.value = "Applied soil bottle result ($soilTypeKey) to Diagnose & Problem Matcher!"
+    }
+
+    fun runAzHomeOrExteriorVideoAi(
+        context: Context,
+        mode: String,
+        problemArea: String,
+        userDescription: String
+    ) {
+        viewModelScope.launch {
+            _azHomeInspectionState.value = UiState.Loading
+            val w = _weatherNewsState.value
+            val bitmaps = withContext(Dispatchers.IO) {
+                val list = mutableListOf<Bitmap>()
+                val primary = _mediaAttachment.value
+                if (primary != null && primary.mediaType == "video" && primary.localUriString.isNotBlank()) {
+                    val uri = runCatching { Uri.parse(primary.localUriString) }.getOrNull()
+                    if (uri != null) {
+                        val retriever = MediaMetadataRetriever()
+                        runCatching {
+                            retriever.setDataSource(context, uri)
+                            val durMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                ?.toLongOrNull()?.coerceAtLeast(1000L) ?: 4000L
+                            listOf(0.1, 0.35, 0.65, 0.9).forEach { pct ->
+                                val frame = retriever.getFrameAtTime((durMs * pct).toLong() * 1000L)
+                                if (frame != null) list.add(scaleBitmap(frame, 720))
+                            }
+                        }
+                        runCatching { retriever.release() }
+                    }
+                }
+                if (list.isEmpty()) {
+                    primary?.previewBitmap?.let { list.add(it) }
+                    _extraPhotos.value.forEach { it.previewBitmap?.let { bmp -> list.add(bmp) } }
+                }
+                list.take(5)
+            }
+            val elevPair = weatherNewsRepo.fetchElevationAndMotherNatureHistory(w.latitude, w.longitude)
+            aiRepo.analyzeAzHouseOrExteriorVideoProblem(
+                mode = mode,
+                city = w.selectedCity,
+                state = w.selectedState,
+                elevationFeet = elevPair.first,
+                problemArea = problemArea,
+                userDescription = userDescription,
+                bitmaps = bitmaps
+            ).onSuccess { inspection ->
+                _azHomeInspectionState.value = UiState.Success(inspection)
+                _problemMatchQuery.value = ProblemMatchQuery(
+                    problemCategory = inspection.recommendedSpecialtyKey,
+                    problemText = "${inspection.detectedIssueTitle}: ${inspection.scopeOfWork}",
+                    constructionStage = "none",
+                    depthFeet = 0.0,
+                    city = w.selectedCity,
+                    needsOnSiteCrew = true
+                )
+            }.onFailure { err ->
+                _azHomeInspectionState.value = UiState.Error(err.localizedMessage ?: "AI house inspector unavailable")
+            }
+        }
+    }
+
+    fun routeAzProblemToPros(specialtyKey: String, summary: String) {
+        val w = _weatherNewsState.value
+        _problemMatchQuery.value = ProblemMatchQuery(
+            problemCategory = specialtyKey,
+            problemText = summary,
+            constructionStage = "none",
+            depthFeet = 0.0,
+            city = w.selectedCity,
+            needsOnSiteCrew = true
+        )
+        _aiMatchConciergeState.value = null
+    }
+
+    fun runBuildingPhotoAiAnalysis(
+        buildingType: String,
+        buildingPortion: String,
+        notes: String
+    ) {
+        val bitmaps = buildList {
+            _buildingPhotoAttachment.value?.previewBitmap?.let { add(it) }
+            _buildingExtraPhotos.value.forEach { extra -> extra.previewBitmap?.let { add(it) } }
+        }
+        if (bitmaps.isEmpty()) {
+            _buildingPhotoAnalysisState.value = UiState.Error(
+                "Please take or upload at least one photo of any house or building portion first."
+            )
+            return
+        }
+        viewModelScope.launch {
+            _buildingPhotoAnalysisState.value = UiState.Loading
+            val w = _weatherNewsState.value
+            val elevPair = weatherNewsRepo.fetchElevationAndMotherNatureHistory(w.latitude, w.longitude)
+            aiRepo.analyzeBuildingOrExteriorPhotos(
+                city = w.selectedCity,
+                state = w.selectedState,
+                elevationFeet = elevPair.first,
+                buildingType = buildingType,
+                buildingPortion = buildingPortion,
+                notes = notes,
+                bitmaps = bitmaps
+            ).onSuccess { analysis ->
+                _buildingPhotoAnalysisState.value = UiState.Success(analysis)
+                _problemMatchQuery.value = ProblemMatchQuery(
+                    problemCategory = analysis.topRecommendedSpecialtyKey,
+                    problemText = "${analysis.inspectedPortion} (${analysis.overallRiskBadge}): ${analysis.summary}",
+                    constructionStage = "none",
+                    depthFeet = 0.0,
+                    city = w.selectedCity,
+                    needsOnSiteCrew = true
+                )
+            }.onFailure { err ->
+                _buildingPhotoAnalysisState.value = UiState.Error(
+                    err.localizedMessage ?: "Building photo AI inspection failed. Please retry."
+                )
+            }
+        }
+    }
+
+    fun routeBuildingIssueToPros(specialtyKey: String, summary: String) {
+        val w = _weatherNewsState.value
+        _problemMatchQuery.value = ProblemMatchQuery(
+            problemCategory = specialtyKey,
+            problemText = summary,
+            constructionStage = "none",
+            depthFeet = 0.0,
+            city = w.selectedCity,
+            needsOnSiteCrew = true
+        )
+        _aiMatchConciergeState.value = null
+    }
+
+    fun runPestControlAiAnalysis(
+        focusType: String,
+        userConcern: String
+    ) {
+        val bitmaps = buildList {
+            _pestPhotoAttachment.value?.previewBitmap?.let { add(it) }
+            _pestExtraPhotos.value.forEach { extra -> extra.previewBitmap?.let { add(it) } }
+        }
+        if (bitmaps.isEmpty() && userConcern.isBlank()) {
+            _pestAnalysisState.value = UiState.Error(
+                "Take or upload a photo of a possible rodent/pest entry point or describe your pest concern first."
+            )
+            return
+        }
+        viewModelScope.launch {
+            _pestAnalysisState.value = UiState.Loading
+            val w = _weatherNewsState.value
+            aiRepo.analyzePestOrRodentEntryProblem(
+                city = w.selectedCity,
+                state = w.selectedState,
+                focusType = focusType,
+                userConcern = userConcern,
+                bitmaps = bitmaps
+            ).onSuccess { analysis ->
+                _pestAnalysisState.value = UiState.Success(analysis)
+                _problemMatchQuery.value = ProblemMatchQuery(
+                    problemCategory = "pest_control",
+                    problemText = "${analysis.suspectedCurrentProblem}: ${analysis.confidenceSummary}",
+                    constructionStage = "none",
+                    depthFeet = 0.0,
+                    city = w.selectedCity,
+                    needsOnSiteCrew = true
+                )
+            }.onFailure { err ->
+                _pestAnalysisState.value = UiState.Error(
+                    err.localizedMessage ?: "Pest AI inspection failed. Please retry."
+                )
+            }
+        }
+    }
+
+    fun routePestIssueToPros(summary: String) {
+        val w = _weatherNewsState.value
+        _problemMatchQuery.value = ProblemMatchQuery(
+            problemCategory = "pest_control",
+            problemText = summary,
+            constructionStage = "none",
+            depthFeet = 0.0,
+            city = w.selectedCity,
+            needsOnSiteCrew = true
+        )
+        _aiMatchConciergeState.value = null
+    }
+
+    fun searchOnlineContractors(tradeLabel: String, issueDescription: String) {
+        val w = _weatherNewsState.value
+        viewModelScope.launch {
+            _onlineContractorLeadsState.value = UiState.Loading
+            aiRepo.findOnlineReputableContractors(
+                tradeLabel = tradeLabel,
+                city = w.selectedCity,
+                state = w.selectedState,
+                issueDescription = issueDescription
+            ).onSuccess { leads ->
+                _onlineContractorLeadsState.value = UiState.Success(leads)
+            }.onFailure { err ->
+                _onlineContractorLeadsState.value = UiState.Error(err.localizedMessage ?: "Online contractor search failed")
+            }
+        }
+    }
+
+    // --- Real Contractor Field Product Reviews ---
+
+    fun createContractorProductReview(
+        contractorName: String,
+        companyName: String,
+        licenseNumber: String,
+        productSku: String,
+        productName: String,
+        brandModel: String,
+        category: String,
+        disasterUseCase: String,
+        rating: Int,
+        jobsUsedCount: Int,
+        pros: String,
+        cons: String,
+        honestReview: String,
+        wouldUseOnInsuredJob: Boolean,
+        onSubmitted: () -> Unit = {}
+    ) {
+        if (productName.trim().length < 2 || honestReview.trim().length < 5) {
+            _statusBanner.value = "Enter product name and honest contractor field review (min 5 chars)."
+            return
+        }
+        viewModelScope.launch {
+            _isSubmitting.value = true
+            repository.createContractorProductReview(
+                contractorName = contractorName,
+                companyName = companyName,
+                licenseNumber = licenseNumber,
+                productSku = productSku,
+                productName = productName,
+                brandModel = brandModel,
+                category = category,
+                disasterUseCase = disasterUseCase,
+                rating = rating,
+                jobsUsedCount = jobsUsedCount,
+                pros = pros,
+                cons = cons,
+                honestReview = honestReview,
+                wouldUseOnInsuredJob = wouldUseOnInsuredJob
+            ).onSuccess {
+                _statusBanner.value = "Contractor field product review published!"
+                onSubmitted()
+            }.onFailure {
+                _statusBanner.value = it.localizedMessage ?: "Could not post product review"
+            }
+            _isSubmitting.value = false
+        }
+    }
+
+    // --- Nearby Remediation Equipment Rentals ---
+
+    fun listEquipmentForRent(
+        ownerType: String,
+        companyName: String,
+        equipmentName: String,
+        category: String,
+        city: String,
+        dailyRateUsd: Int,
+        depositUsd: Int,
+        specs: String,
+        contactPhoneOrNote: String,
+        onListed: () -> Unit = {}
+    ) {
+        if (equipmentName.trim().length < 2) {
+            _statusBanner.value = "Enter equipment name (e.g., Commercial LGR Dehumidifier)."
+            return
+        }
+        viewModelScope.launch {
+            _isSubmitting.value = true
+            repository.createEquipmentRental(
+                ownerType = ownerType,
+                companyName = companyName,
+                equipmentName = equipmentName,
+                category = category,
+                city = city.ifBlank { _weatherNewsState.value.selectedCity },
+                dailyRateUsd = dailyRateUsd,
+                depositUsd = depositUsd,
+                specs = specs,
+                contactPhoneOrNote = contactPhoneOrNote
+            ).onSuccess {
+                _statusBanner.value = "Remediation equipment listed for nearby pickup!"
+                onListed()
+            }.onFailure {
+                _statusBanner.value = it.localizedMessage ?: "Failed to list equipment"
+            }
+            _isSubmitting.value = false
+        }
+    }
+
+    fun toggleEquipmentRentalAvailability(rentalId: String, available: Boolean) {
+        viewModelScope.launch {
+            repository.toggleEquipmentAvailability(rentalId, available)
+                .onSuccess { _statusBanner.value = if (available) "Marked equipment Available." else "Marked equipment Currently Rented Out." }
+                .onFailure { _statusBanner.value = it.localizedMessage ?: "Failed to update rental availability" }
+        }
+    }
+
+    fun deleteEquipmentRental(rentalId: String) {
+        viewModelScope.launch {
+            repository.deleteEquipmentRental(rentalId)
+                .onSuccess { _statusBanner.value = "Equipment rental removed." }
+                .onFailure { _statusBanner.value = it.localizedMessage ?: "Failed to delete listing" }
+        }
+    }
+
+    // --- Contractor & Community App Revision Suggestions ---
+
+    fun submitAppRevisionSuggestion(
+        authorRole: String,
+        tradeOrSpecialty: String,
+        title: String,
+        category: String,
+        description: String,
+        onSubmitted: () -> Unit = {}
+    ) {
+        if (title.trim().length < 3 || description.trim().length < 5) {
+            _statusBanner.value = "Provide a concise revision title & description."
+            return
+        }
+        viewModelScope.launch {
+            _isSubmitting.value = true
+            repository.submitAppRevisionSuggestion(authorRole, tradeOrSpecialty, title, category, description)
+                .onSuccess {
+                    _statusBanner.value = "Revision suggestion published for everyone to vote on!"
+                    onSubmitted()
+                }
+                .onFailure { _statusBanner.value = it.localizedMessage ?: "Failed to post suggestion" }
+            _isSubmitting.value = false
+        }
+    }
+
+    fun upvoteAppRevisionSuggestion(suggestionId: String, currentVotes: Int) {
+        viewModelScope.launch {
+            repository.upvoteAppRevisionSuggestion(suggestionId, currentVotes)
+                .onSuccess { _statusBanner.value = "Voted for app revision!" }
+                .onFailure { _statusBanner.value = it.localizedMessage ?: "Vote failed" }
+        }
+    }
+
+    // --- Industrial Hygienist Air & Tape Sampling ---
+
+    fun submitHygienistSampleRequest(
+        city: String,
+        propertyAddressHint: String,
+        sampleTypes: List<String>,
+        reasonNotes: String,
+        onSubmitted: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            _isSubmitting.value = true
+            repository.createHygienistSampleRequest(
+                city = city.ifBlank { _weatherNewsState.value.selectedCity },
+                propertyAddressHint = propertyAddressHint,
+                sampleTypes = sampleTypes,
+                reasonNotes = reasonNotes
+            ).onSuccess {
+                _statusBanner.value = "Air & Tape Sample request posted to local Industrial Hygienists!"
+                onSubmitted()
+            }.onFailure {
+                _statusBanner.value = it.localizedMessage ?: "Failed to request hygienist sample"
+            }
+            _isSubmitting.value = false
+        }
+    }
+
+    fun updateHygienistLabResult(
+        requestId: String,
+        hygienistName: String,
+        status: String,
+        quotedFeeUsd: Int,
+        labFindingsSummary: String
+    ) {
+        viewModelScope.launch {
+            _isSubmitting.value = true
+            repository.claimOrUpdateHygienistRequest(
+                requestId = requestId,
+                hygienistName = hygienistName,
+                status = status,
+                quotedFeeUsd = quotedFeeUsd,
+                labFindingsSummary = labFindingsSummary
+            ).onSuccess {
+                _statusBanner.value = "Hygienist sample request updated ($status)."
+            }.onFailure {
+                _statusBanner.value = it.localizedMessage ?: "Only Industrial Hygienists / IICRC pros can claim sampling requests."
+            }
+            _isSubmitting.value = false
+        }
+    }
+
+    // --- Direct In-App Insurance Policy Quotes & Telemetry Rate Discounts ---
+
+    fun requestOrIssueInsurancePolicy(
+        isCarrierIssuingQuote: Boolean,
+        insurerUserId: String,
+        carrierName: String,
+        targetClientUserId: String,
+        targetClientName: String,
+        propertyLabel: String,
+        city: String,
+        coverageType: String,
+        coverageLimitUsd: Int,
+        deductibleUsd: Int,
+        baseMonthlyPremiumUsd: Int,
+        telemetryDiscountPercent: Int,
+        policyTermsSummary: String
+    ) {
+        viewModelScope.launch {
+            _isSubmitting.value = true
+            repository.createOrRequestInsurancePolicy(
+                isCarrierIssuingQuote = isCarrierIssuingQuote,
+                insurerUserId = insurerUserId,
+                carrierName = carrierName,
+                targetClientUserId = targetClientUserId,
+                targetClientName = targetClientName,
+                propertyLabel = propertyLabel,
+                city = city.ifBlank { _weatherNewsState.value.selectedCity },
+                coverageType = coverageType,
+                coverageLimitUsd = coverageLimitUsd,
+                deductibleUsd = deductibleUsd,
+                baseMonthlyPremiumUsd = baseMonthlyPremiumUsd,
+                telemetryDiscountPercent = telemetryDiscountPercent,
+                policyTermsSummary = policyTermsSummary
+            ).onSuccess {
+                _statusBanner.value = if (isCarrierIssuingQuote) {
+                    "Direct in-app policy quote published with $telemetryDiscountPercent% telemetry discount!"
+                } else {
+                    "Discounted policy quote request sent to $carrierName!"
+                }
+            }.onFailure {
+                _statusBanner.value = it.localizedMessage ?: "Policy request/quote failed"
+            }
+            _isSubmitting.value = false
+        }
+    }
+
+    fun respondToInsurancePolicyOffer(
+        policyId: String,
+        newStatus: String,
+        asClientAccepting: Boolean
+    ) {
+        viewModelScope.launch {
+            _isSubmitting.value = true
+            repository.respondToInsurancePolicyOffer(policyId, newStatus, asClientAccepting)
+                .onSuccess {
+                    _statusBanner.value = "Insurance policy status updated to $newStatus!"
+                }
+                .onFailure {
+                    _statusBanner.value = it.localizedMessage ?: "Failed to update policy offer"
+                }
+            _isSubmitting.value = false
+        }
+    }
+
+    // --- Top User Field Scout Application ---
+
+    fun submitFieldScoutApplication(
+        applicantName: String,
+        city: String,
+        scoutScore: Int,
+        verifiedReportsCount: Int,
+        availabilitySummary: String,
+        coverageNotes: String
+    ) {
+        viewModelScope.launch {
+            _isSubmitting.value = true
+            repository.submitFieldScoutApplication(
+                applicantName = applicantName,
+                city = city.ifBlank { _weatherNewsState.value.selectedCity },
+                scoutScore = scoutScore,
+                verifiedReportsCount = verifiedReportsCount,
+                availabilitySummary = availabilitySummary,
+                coverageNotes = coverageNotes
+            ).onSuccess {
+                _statusBanner.value = "Paid Town Field Scout application submitted! Free subscription earned on approval."
+            }.onFailure {
+                _statusBanner.value = it.localizedMessage ?: "Failed to submit application"
             }
             _isSubmitting.value = false
         }
