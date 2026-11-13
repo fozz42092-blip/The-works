@@ -1,0 +1,310 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private user settings and preferred city for groundwater monitoring.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "preferredCity": { "type": "string", "description": "Default monitored city or town" },
+        "rolePreference": { "type": "string", "enum": ["resident", "contractor"], "description": "Preferred app role" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["userId", "displayName", "preferredCity", "rolePreference", "createdAt", "updatedAt"]
+    },
+    "WaterReport": {
+      "title": "WaterReport",
+      "description": "Community GPS-stamped groundwater, street flood, water loss, mold, smoke, and fire documentation with multi-photo support and AI triage.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Reporter Firebase Auth UID" },
+        "authorName": { "type": "string", "description": "Reporter public display name" },
+        "authorRole": { "type": "string", "enum": ["resident", "contractor", "engineer"] },
+        "visibility": { "type": "string", "enum": ["community", "private", "pending_review", "flagged"] },
+        "moderationStatus": { "type": "string", "enum": ["approved", "pending_review", "ai_verified", "flagged"] },
+        "moderationNotes": { "type": "string" },
+        "plausibilityScore": { "type": "integer" },
+        "city": { "type": "string", "description": "City or town name" },
+        "stateOrRegion": { "type": "string", "description": "State or region" },
+        "addressHint": { "type": "string", "description": "Street intersection or neighborhood hint" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "depthFeet": { "type": "number", "description": "Estimated water table depth in feet" },
+        "soilType": { "type": "string", "enum": ["clay", "sand", "silt", "loam", "gravel", "bedrock", "unknown"] },
+        "constructionStage": { "type": "string", "enum": ["none", "in_process", "after_remodel"], "description": "Whether site is pre-construction, construction in process, or after full remodel" },
+        "lossCategory": { "type": "string", "enum": ["groundwater", "water_restoration", "mold_mitigation", "smoke_damage", "fire_restoration"] },
+        "situationType": { "type": "string", "enum": ["groundwater_seepage", "street_flooding", "basement_intrusion", "subsurface_test", "drainage_backup", "water_loss", "mold_growth", "smoke_soot", "fire_char"] },
+        "waterSourceVerdict": { "type": "string", "enum": ["ground_water_table", "surface_runoff", "plumbing_leak", "storm_drain_backup", "water_loss_mitigation", "mold_mitigation", "smoke_fire_mitigation", "uncertain"] },
+        "aiConfidence": { "type": "integer" },
+        "aiSummary": { "type": "string" },
+        "lossDescription": { "type": "string", "description": "Full documented description of water, mold, smoke, or fire loss" },
+        "restorationScope": { "type": "string", "description": "AI or licensed company restoration & mitigation plan" },
+        "recommendedSolutions": { "type": "array" },
+        "notes": { "type": "string" },
+        "mediaType": { "type": "string", "enum": ["none", "photo", "video"] },
+        "mediaPreviewBase64": { "type": "string" },
+        "extraPhotosBase64": { "type": "array", "description": "Up to 3 extra compressed damage photos" },
+        "videoDurationLabel": { "type": "string" },
+        "streetFloodRisk": { "type": "string", "enum": ["low", "moderate", "high", "critical"] },
+        "upvotesCount": { "type": "integer" },
+        "solutionApplied": { "type": "string" },
+        "solutionWorked": { "type": "boolean" },
+        "engineerVerified": { "type": "boolean" },
+        "verifiedByContractorId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "authorName", "authorRole", "visibility", "moderationStatus", "moderationNotes",
+        "plausibilityScore", "city", "stateOrRegion",
+        "addressHint", "latitude", "longitude", "depthFeet", "soilType", "constructionStage", "lossCategory",
+        "situationType", "waterSourceVerdict", "aiConfidence", "aiSummary",
+        "lossDescription", "restorationScope", "recommendedSolutions", "notes",
+        "mediaType", "mediaPreviewBase64", "extraPhotosBase64", "videoDurationLabel",
+        "streetFloodRisk", "upvotesCount", "solutionApplied", "solutionWorked",
+        "engineerVerified", "verifiedByContractorId", "createdAt", "updatedAt"
+      ]
+    },
+    "SolutionOutcome": {
+      "title": "SolutionOutcome",
+      "description": "Verified repair outcome logged by residents or contractors to train adaptive solution rankings.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "reportId": { "type": "string" },
+        "isPublic": { "type": "boolean" },
+        "city": { "type": "string" },
+        "soilType": { "type": "string", "enum": ["clay", "sand", "silt", "loam", "gravel", "bedrock", "unknown"] },
+        "waterSource": { "type": "string", "enum": ["ground_water_table", "surface_runoff", "plumbing_leak", "storm_drain_backup", "water_loss_mitigation", "mold_mitigation", "smoke_fire_mitigation", "uncertain"] },
+        "solutionName": { "type": "string" },
+        "worked": { "type": "boolean" },
+        "effectivenessScore": { "type": "integer" },
+        "estimatedCostUsd": { "type": "integer" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "reportId", "isPublic", "city", "soilType", "waterSource",
+        "solutionName", "worked", "effectivenessScore", "estimatedCostUsd",
+        "notes", "createdAt", "updatedAt"
+      ]
+    },
+    "ContractorProfile": {
+      "title": "ContractorProfile",
+      "description": "Licensed engineers and water, mold, smoke, & fire mitigation companies offering remote input and on-site restoration work.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "companyName": { "type": "string" },
+        "specialty": { "type": "string", "enum": ["soil_engineer", "general_engineer", "drainage_contractor", "leak_specialist", "water_mitigation", "mold_remediation", "smoke_fire_restoration", "full_service_restoration"] },
+        "licenseNumber": { "type": "string" },
+        "licensingState": { "type": "string" },
+        "primaryCity": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "serviceCities": { "type": "array" },
+        "consultationFeeUsd": { "type": "integer" },
+        "platformFeePercent": { "type": "integer" },
+        "offersOnSiteWork": { "type": "boolean" },
+        "bio": { "type": "string" },
+        "completedReviewsCount": { "type": "integer" },
+        "helpfulContributionsCount": { "type": "integer" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "displayName", "companyName", "specialty", "licenseNumber",
+        "licensingState", "primaryCity", "latitude", "longitude", "serviceCities",
+        "consultationFeeUsd", "platformFeePercent", "offersOnSiteWork", "bio",
+        "completedReviewsCount", "helpfulContributionsCount", "isActive",
+        "createdAt", "updatedAt"
+      ]
+    },
+    "ConsultationRequest": {
+      "title": "ConsultationRequest",
+      "description": "Remote engineering advice or on-site restoration dispatch linking a documented loss report to the nearest helpful contractor.",
+      "type": "object",
+      "properties": {
+        "clientUserId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "contractorUserId": { "type": "string" },
+        "contractorName": { "type": "string" },
+        "reportId": { "type": "string" },
+        "city": { "type": "string" },
+        "serviceMode": { "type": "string", "enum": ["remote_advice", "restoration_work"] },
+        "lossCategory": { "type": "string", "enum": ["groundwater", "water_restoration", "mold_mitigation", "smoke_damage", "fire_restoration"] },
+        "question": { "type": "string" },
+        "status": { "type": "string", "enum": ["requested", "reviewed", "completed", "cancelled"] },
+        "engineerVerdict": { "type": "string", "enum": ["pending", "ground_water_table", "surface_runoff", "plumbing_leak", "needs_site_boring", "water_mitigation_approved", "mold_remediation_approved", "smoke_fire_approved"] },
+        "engineerRecommendation": { "type": "string" },
+        "proposedWorkEstimateUsd": { "type": "integer" },
+        "contractorFeeUsd": { "type": "integer" },
+        "platformFeeUsd": { "type": "integer" },
+        "totalFeeUsd": { "type": "integer" },
+        "clientRating": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "clientUserId", "clientName", "contractorUserId", "contractorName",
+        "reportId", "city", "serviceMode", "lossCategory", "question", "status",
+        "engineerVerdict", "engineerRecommendation", "proposedWorkEstimateUsd",
+        "contractorFeeUsd", "platformFeeUsd", "totalFeeUsd", "clientRating",
+        "createdAt", "updatedAt"
+      ]
+    },
+    "ContractorReview": {
+      "title": "ContractorReview",
+      "description": "Public Glass Wall honest customer review with photo proof evaluating workmanship, character, communication, and shoddy-work blacklist flags.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Reviewer Firebase Auth UID" },
+        "reviewerName": { "type": "string" },
+        "contractorUserId": { "type": "string" },
+        "contractorName": { "type": "string" },
+        "companyOrLicenseRef": { "type": "string" },
+        "city": { "type": "string" },
+        "isPublic": { "type": "boolean" },
+        "workCategory": { "type": "string", "enum": ["groundwater", "water_restoration", "mold_mitigation", "smoke_damage", "fire_restoration", "engineering_review"] },
+        "overallRating": { "type": "integer" },
+        "communicationRating": { "type": "integer" },
+        "honestExperience": { "type": "string" },
+        "proofDescription": { "type": "string" },
+        "proofPhotoBase64": { "type": "string" },
+        "hasProof": { "type": "boolean" },
+        "wouldRecommend": { "type": "boolean" },
+        "flagShoddyWork": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "reviewerName", "contractorUserId", "contractorName", "companyOrLicenseRef",
+        "city", "isPublic", "workCategory", "overallRating", "communicationRating",
+        "honestExperience", "proofDescription", "proofPhotoBase64", "hasProof",
+        "wouldRecommend", "flagShoddyWork", "createdAt", "updatedAt"
+      ]
+    },
+    "ContractorPortfolioItem": {
+      "title": "ContractorPortfolioItem",
+      "description": "Contractor-uploaded past work showcase or verified past client referral.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Contractor Firebase Auth UID" },
+        "contractorName": { "type": "string" },
+        "entryType": { "type": "string", "enum": ["portfolio", "referral"] },
+        "isPublic": { "type": "boolean" },
+        "title": { "type": "string" },
+        "lossCategory": { "type": "string", "enum": ["groundwater", "water_restoration", "mold_mitigation", "smoke_damage", "fire_restoration"] },
+        "city": { "type": "string" },
+        "clientReferenceName": { "type": "string" },
+        "description": { "type": "string" },
+        "completionYear": { "type": "string" },
+        "photoBase64": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "contractorName", "entryType", "isPublic", "title",
+        "lossCategory", "city", "clientReferenceName", "description",
+        "completionYear", "photoBase64", "createdAt", "updatedAt"
+      ]
+    },
+    "ModerationTicket": {
+      "title": "ModerationTicket",
+      "description": "Pre-publication moderation queue item for new photo uploads and detailed reports.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "reportId": { "type": "string" },
+        "city": { "type": "string" },
+        "lossCategory": { "type": "string", "enum": ["groundwater", "water_restoration", "mold_mitigation", "smoke_damage", "fire_restoration"] },
+        "hasMedia": { "type": "boolean" },
+        "isDetailedReport": { "type": "boolean" },
+        "plausibilityScore": { "type": "integer" },
+        "completenessIssues": { "type": "array" },
+        "queueStatus": { "type": "string", "enum": ["pending", "approved", "flagged"] },
+        "aiModerationNotes": { "type": "string" },
+        "reviewedByUid": { "type": "string" },
+        "previewSummary": { "type": "string" },
+        "photoBase64": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "authorName", "reportId", "city", "lossCategory", "hasMedia",
+        "isDetailedReport", "plausibilityScore", "completenessIssues", "queueStatus",
+        "aiModerationNotes", "reviewedByUid", "previewSummary", "photoBase64",
+        "createdAt", "updatedAt"
+      ]
+    },
+    "SupplyOrder": {
+      "title": "SupplyOrder",
+      "description": "Private wholesale drop-ship order for French drain, sump pump, and waterproofing materials.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "jobDescription": { "type": "string" },
+        "shippingCity": { "type": "string" },
+        "shippingAddress": { "type": "string" },
+        "itemSummaries": { "type": "array" },
+        "wholesaleTotalUsd": { "type": "number" },
+        "retailBenchmarkUsd": { "type": "number" },
+        "totalSavingsUsd": { "type": "number" },
+        "platformFeeUsd": { "type": "number" },
+        "status": { "type": "string", "enum": ["submitted", "warehouse_queued", "shipped", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "customerName", "jobDescription", "shippingCity", "shippingAddress",
+        "itemSummaries", "wholesaleTotalUsd", "retailBenchmarkUsd", "totalSavingsUsd",
+        "platformFeeUsd", "status", "createdAt", "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user settings and default city."
+    },
+    "/water_reports/{reportId}": {
+      "schema": { "$ref": "#/entities/WaterReport" },
+      "description": "Community groundwater table, street flood, and water/mold/smoke/fire loss documentation."
+    },
+    "/solution_outcomes/{outcomeId}": {
+      "schema": { "$ref": "#/entities/SolutionOutcome" },
+      "description": "Community-verified repair solution outcomes for adaptive learning."
+    },
+    "/contractors/{contractorId}": {
+      "schema": { "$ref": "#/entities/ContractorProfile" },
+      "description": "Licensed engineers and water/mold/smoke/fire mitigation companies directory."
+    },
+    "/consultations/{consultationId}": {
+      "schema": { "$ref": "#/entities/ConsultationRequest" },
+      "description": "Private consultation and restoration dispatch requests between residents and licensed contractors."
+    },
+    "/contractor_reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/ContractorReview" },
+      "description": "Glass Wall honest customer reviews and shoddy-work blacklist flags."
+    },
+    "/contractor_portfolio/{itemId}": {
+      "schema": { "$ref": "#/entities/ContractorPortfolioItem" },
+      "description": "Contractor real work portfolio photos and past client referrals."
+    },
+    "/moderation_queue/{ticketId}": {
+      "schema": { "$ref": "#/entities/ModerationTicket" },
+      "description": "Moderation workflow queue for photo uploads and detailed reports before public release."
+    },
+    "/supply_orders/{orderId}": {
+      "schema": { "$ref": "#/entities/SupplyOrder" },
+      "description": "Private wholesale drop-ship material orders."
+    }
+  }
+}

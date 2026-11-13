@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<resources>
+    <string name="firestore_database_id" translatable="false">ai-studio-android-watertab-17fbfee5-d339-4b49-b52f-f39f67501791</string>
+    <string name="recaptcha_site_key" translatable="false">6Lcttx0uAAAAAIMJx2Q5k41xAvStcLI9j2LWDBGh</string>
+</resources>

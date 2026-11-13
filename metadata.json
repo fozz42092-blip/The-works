@@ -1,0 +1,6 @@
+{
+  "name": "WaterTable",
+  "description": "Community ground water table mapping, AI photo assessment, and repair guidance for residents and contractors.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
